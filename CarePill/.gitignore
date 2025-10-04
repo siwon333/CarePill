@@ -1,9 +1,3 @@
-# Virtual Environments
-venv/
-env/
-ENV/
-.venv/
-
 # Python
 __pycache__/
 *.py[cod]
@@ -26,6 +20,12 @@ wheels/
 .installed.cfg
 *.egg
 
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
 # Django
 *.log
 local_settings.py
@@ -46,6 +46,7 @@ db.sqlite3-journal
 *.swp
 *.swo
 *~
+.DS_Store
 
 # Testing
 .coverage
@@ -62,7 +63,6 @@ dmypy.json
 .ipynb_checkpoints
 
 # OS
-.DS_Store
 Thumbs.db
 
 # Wake Word Models (personal/device-specific)
