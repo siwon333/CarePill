@@ -64,3 +64,18 @@ dmypy.json
 
 # OS
 Thumbs.db
+
+# Wake Word Models (personal/device-specific)
+wake_words/*.ppn
+wake_words/*.pv
+!wake_words/.gitkeep
+
+# Audio Files
+*.mp3
+*.wav
+!static/**/*.mp3
+!media/**/*.mp3
+
+# Test Files (deprecated)
+test_*.py
+!test_wake_word.py
