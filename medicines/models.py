@@ -237,3 +237,33 @@ class Command(BaseCommand):
         text = re.sub(r'(\d+)mg', r'\1밀리그램', text)
         text = re.sub(r'(\d+)mL', r'\1밀리리터', text)
         return text
+    
+from django.contrib.auth.models import User
+
+class UserMedication(models.Model):
+    """사용자 복용약 정보"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='medications')
+    medicine = models.ForeignKey(Medicine, on_delete=models.CASCADE)
+    
+    # 처방 정보
+    dosage = models.CharField(max_length=100, blank=True, null=True, verbose_name='투약량')
+    frequency = models.CharField(max_length=100, blank=True, null=True, verbose_name='복용횟수')
+    days = models.CharField(max_length=50, blank=True, null=True, verbose_name='복용기간')
+    
+    # 추가 정보
+    prescription_date = models.DateField(blank=True, null=True, verbose_name='조제일자')
+    start_date = models.DateField(auto_now_add=True, verbose_name='등록일')
+    pharmacy_name = models.CharField(max_length=200, blank=True, null=True, verbose_name='약국명')
+    hospital_name = models.CharField(max_length=200, blank=True, null=True, verbose_name='병원명')
+    
+    # 복용 완료 여부
+    is_completed = models.BooleanField(default=False, verbose_name='복용완료')
+    
+    class Meta:
+        db_table = 'user_medications'
+        ordering = ['-start_date']
+        verbose_name = '사용자 복용약'
+        verbose_name_plural = '사용자 복용약 목록'
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.medicine.item_name}"

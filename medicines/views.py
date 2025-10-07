@@ -3,6 +3,21 @@ from django.views.decorators.http import require_http_methods
 from django.db.models import Q
 from django.shortcuts import render, get_object_or_404  # 👈 이 줄 추가/수정
 from .models import Medicine, PillIdentification, AccessibilityInfo
+from medicines.models import UserMedication
+from django.contrib.auth.models import User
+
+def my_medications(request):
+    """내 복용약 목록"""
+    user = User.objects.first()  # 임시
+    
+    medications = UserMedication.objects.filter(
+        user=user,
+        is_completed=False
+    ).select_related('medicine', 'medicine__pill_info', 'medicine__accessibility')
+    
+    return render(request, 'medicines/my_medications.html', {
+        'medications': medications
+    })
 
 @require_http_methods(["GET"])
 def search_medicine(request):

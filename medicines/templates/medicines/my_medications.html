@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>내 복용약 목록</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        .med-card {
+            background: white;
+            padding: 30px;
+            margin-bottom: 20px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+        }
+        .med-name {
+            font-size: 1.8em;
+            color: #667eea;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .med-info {
+            font-size: 1.1em;
+            line-height: 2;
+            color: #333;
+        }
+        .med-info strong { color: #667eea; }
+        .back-button {
+            display: inline-block;
+            background: white;
+            color: #667eea;
+            padding: 12px 30px;
+            border-radius: 25px;
+            text-decoration: none;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-button">← 돌아가기</a>
+        <h1>💊 내 복용약 목록</h1>
+        
+        {% for med in medications %}
+        <div class="med-card">
+            <div class="med-name">{{ med.medicine.item_name }}</div>
+            <div class="med-info">
+                <div><strong>제조사:</strong> {{ med.medicine.entp_name }}</div>
+                {% if med.dosage %}<div><strong>투약량:</strong> {{ med.dosage }}</div>{% endif %}
+                {% if med.frequency %}<div><strong>복용횟수:</strong> {{ med.frequency }}</div>{% endif %}
+                {% if med.days %}<div><strong>복용기간:</strong> {{ med.days }}</div>{% endif %}
+                {% if med.prescription_date %}<div><strong>조제일자:</strong> {{ med.prescription_date }}</div>{% endif %}
+                {% if med.pharmacy_name %}<div><strong>약국:</strong> {{ med.pharmacy_name }}</div>{% endif %}
+                <div><strong>등록일:</strong> {{ med.start_date }}</div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="med-card" style="text-align: center; color: #999;">
+            복용 중인 약이 없습니다
+        </div>
+        {% endfor %}
+    </div>
+</body>
+</html>

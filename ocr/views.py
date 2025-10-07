@@ -10,6 +10,9 @@ from django.conf import settings
 from django.core.files.storage import default_storage
 from medicines.models import Medicine
 from django.db.models import Q
+from django.contrib.auth.models import User
+from medicines.models import Medicine, UserMedication
+from datetime import datetime
 
 def ocr_page(request):
     """OCR 메인 페이지"""
@@ -157,26 +160,24 @@ def process_ocr(request):
     
     image_file = request.FILES['image']
     
-    print("\n" + "="*80)
-    print("🔍 OCR 처리 시작")
-    print(f"📁 파일명: {image_file.name}")
-    print(f"📊 파일 크기: {image_file.size / 1024:.2f} KB")
-    print("="*80)
+    # 사용자 정보 (일단 임시로 첫 번째 사용자 사용)
+    # TODO: 실제로는 로그인된 사용자를 사용해야 함
+    try:
+        user = User.objects.first()
+        if not user:
+            # 사용자가 없으면 자동 생성
+            user = User.objects.create_user(username='guest', password='guest123')
+    except:
+        user = None
     
-    # 파일 저장
     file_path = default_storage.save(f'ocr_temp/{image_file.name}', image_file)
     
     try:
         # OpenAI Vision으로 처방전 정보 추출
-        print("\n🤖 OpenAI Vision API 호출 중...")
-        
         with default_storage.open(file_path, 'rb') as f:
             result = call_openai_vision(f)
         
         if not result['success']:
-            print(f"\n❌ 오류 발생: {result['error']}")
-            if 'detail' in result:
-                print(f"📋 상세 오류:\n{result['detail']}")
             return JsonResponse({
                 'success': False,
                 'error': result['error']
@@ -184,77 +185,79 @@ def process_ocr(request):
         
         prescription_data = result['data']
         
-        # 터미널에 결과 출력
-        print("\n" + "="*80)
-        print("✅ OCR 처리 완료!")
-        print("="*80)
-        
-        # 환자 정보
-        print("\n👤 환자 정보:")
-        print(f"  - 이름: {prescription_data.get('patient_name', '정보 없음')}")
-        
-        # 처방 정보
-        print("\n📋 처방 정보:")
-        print(f"  - 조제일자: {prescription_data.get('dispensing_date', '정보 없음')}")
-        print(f"  - 약국: {prescription_data.get('pharmacy_name', '정보 없음')}")
-        print(f"  - 병원: {prescription_data.get('hospital_name', '정보 없음')}")
-        
-        # 의약품 목록
-        medicines_list = prescription_data.get('medicines', [])
-        print(f"\n💊 처방 의약품 ({len(medicines_list)}개):")
-        
-        for idx, med in enumerate(medicines_list, 1):
-            print(f"\n  [{idx}] {med.get('name', '이름 없음')}")
-            if med.get('dosage'):
-                print(f"      📌 투약량: {med['dosage']}")
-            if med.get('frequency'):
-                print(f"      🔄 복용횟수: {med['frequency']}")
-            if med.get('days'):
-                print(f"      📅 복용기간: {med['days']}")
-        
         # 약품명 리스트 추출
-        medicine_names = [med.get('name') for med in medicines_list if med.get('name')]
-        
-        print(f"\n🔍 DB 검색 중... ({len(medicine_names)}개 약품)")
+        medicine_names = [med.get('name') for med in prescription_data.get('medicines', []) if med.get('name')]
         
         # DB에서 의약품 검색
         medicines = search_medicines_by_names(medicine_names)
         
-        print(f"✅ DB에서 {len(medicines)}개 의약품 찾음")
-        
-        for med in medicines:
-            print(f"  - {med['item_name']} ({med['entp_name']})")
+        # 🎯 여기서 사용자 DB에 저장!
+        saved_count = 0
+        if user:
+            # 처방전 정보
+            prescription_date_str = prescription_data.get('dispensing_date')
+            prescription_date = None
+            if prescription_date_str:
+                try:
+                    prescription_date = datetime.strptime(prescription_date_str, '%Y-%m-%d').date()
+                except:
+                    pass
+            
+            pharmacy_name = prescription_data.get('pharmacy_name')
+            hospital_name = prescription_data.get('hospital_name')
+            
+            # 각 약품 저장
+            for med_info in prescription_data.get('medicines', []):
+                med_name = med_info.get('name')
+                if not med_name:
+                    continue
+                
+                # DB에서 약품 찾기
+                try:
+                    medicine = Medicine.objects.filter(
+                        Q(item_name__icontains=med_name) |
+                        Q(item_name__contains=med_name)
+                    ).first()
+                    
+                    if medicine:
+                        # 사용자 복용약에 저장
+                        UserMedication.objects.create(
+                            user=user,
+                            medicine=medicine,
+                            dosage=med_info.get('dosage'),
+                            frequency=med_info.get('frequency'),
+                            days=med_info.get('days'),
+                            prescription_date=prescription_date,
+                            pharmacy_name=pharmacy_name,
+                            hospital_name=hospital_name,
+                        )
+                        saved_count += 1
+                except Exception as e:
+                    print(f"약품 저장 실패: {med_name} - {str(e)}")
+                    continue
         
         # 처방전 정보와 DB 정보 매칭
         for med_info in prescription_data.get('medicines', []):
             med_name = med_info.get('name')
             if med_name:
-                # DB에서 찾은 의약품과 매칭
                 for db_med in medicines:
                     if med_name in db_med['item_name'] or db_med['item_name'] in med_name:
                         med_info['db_info'] = db_med
                         break
         
-        print("\n" + "="*80)
-        print("🎉 처리 완료!\n")
-        
         return JsonResponse({
             'success': True,
             'prescription': prescription_data,
             'medicines': medicines,
-            'count': len(medicines)
+            'count': len(medicines),
+            'saved_count': saved_count,  # 저장된 약품 수
+            'message': f'✅ {saved_count}개 약품이 내 복용약에 저장되었습니다!'
         })
     
     except Exception as e:
         import traceback
-        error_trace = traceback.format_exc()
-        
-        print("\n" + "="*80)
-        print("❌ 처리 중 오류 발생")
-        print("="*80)
         print(f"오류: {str(e)}")
-        print(f"\n상세 오류:\n{error_trace}")
-        print("="*80 + "\n")
+        print(traceback.format_exc())
         
         return JsonResponse({
             'success': False,
@@ -262,7 +265,5 @@ def process_ocr(request):
         }, status=500)
     
     finally:
-        # 임시 파일 삭제
         if default_storage.exists(file_path):
             default_storage.delete(file_path)
-            print(f"🗑️  임시 파일 삭제됨: {file_path}\n")
