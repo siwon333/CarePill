@@ -76,6 +76,9 @@ wake_words/*.pv
 !static/**/*.mp3
 !media/**/*.mp3
 
+
 # Test Files (deprecated)
 test_*.py
 !test_wake_word.py
+local_settings.py
+*.csv
