@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>시각장애인용 의약품 검색 시스템</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        h1 {
+            color: #667eea;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        .search-box {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        
+        .search-form {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        input[type="text"] {
+            flex: 1;
+            padding: 15px 25px;
+            font-size: 1.2em;
+            border: 2px solid #e0e0e0;
+            border-radius: 50px;
+            outline: none;
+            transition: all 0.3s;
+        }
+        
+        input[type="text"]:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        button {
+            padding: 15px 40px;
+            font-size: 1.2em;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            font-weight: bold;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .search-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .btn-secondary {
+            padding: 10px 20px;
+            font-size: 0.95em;
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+        
+        .btn-secondary:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        .results {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        
+        .medicine-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+        
+        .medicine-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        }
+        
+        .medicine-name {
+            font-size: 1.4em;
+            color: #333;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        
+        .medicine-company {
+            color: #667eea;
+            font-size: 1em;
+            margin-bottom: 15px;
+        }
+        
+        .medicine-effect {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 15px;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            background: #e8f4f8;
+            color: #0277bd;
+            border-radius: 20px;
+            font-size: 0.85em;
+            margin-right: 5px;
+            margin-top: 5px;
+        }
+        
+        .badge.video {
+            background: #fce4ec;
+            color: #c2185b;
+        }
+        
+        .badge.pill {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+        
+        .no-results {
+            background: white;
+            padding: 60px;
+            border-radius: 20px;
+            text-align: center;
+            color: #999;
+            font-size: 1.2em;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: white;
+            font-size: 1.3em;
+        }
+        
+        .stats {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+        }
+        
+        .stat-item {
+            flex: 1;
+        }
+        
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .pill-image {
+            width: 100%;
+            height: 150px;
+            object-fit: contain;
+            margin-bottom: 15px;
+            background: #f5f5f5;
+            border-radius: 10px;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.8em;
+            }
+            
+            .search-form {
+                flex-direction: column;
+            }
+            
+            .results {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats {
+                flex-direction: column;
+                gap: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏥 의약품 검색 시스템</h1>
+            <p class="subtitle">시각장애인을 위한 음성·수어 지원 서비스</p>
+        </header>
+
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-number" id="total-medicines">-</div>
+                <div class="stat-label">총 의약품</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="total-videos">-</div>
+                <div class="stat-label">음성·수어 영상</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="total-pills">-</div>
+                <div class="stat-label">낱알 정보</div>
+            </div>
+        </div>
+
+        <div class="search-box">
+            <form class="search-form" onsubmit="searchMedicines(event)">
+                <input type="text" id="searchInput" placeholder="의약품 이름, 제조사, 성분을 입력하세요..." autofocus>
+                <button type="submit">🔍 검색</button>
+            </form>
+            
+            <div class="search-buttons">
+                <button class="btn-secondary" onclick="location.href='/ocr/'">📋 처방전 인식하기</button>
+                <button class="btn-secondary" onclick="location.href='/api/medicines/my-medications/'">💊 내 복용약 보기</button>
+                <button class="btn-secondary" onclick="showVideos()">🎥 음성·수어 영상</button>
+            </div>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // 통계 로드
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/medicines/stats/');
+                const data = await response.json();
+                document.getElementById('total-medicines').textContent = data.total_medicines.toLocaleString();
+                document.getElementById('total-videos').textContent = data.total_videos;
+                document.getElementById('total-pills').textContent = data.total_pills;
+            } catch (error) {
+                console.error('통계 로드 실패:', error);
+            }
+        }
+
+        // 검색
+        async function searchMedicines(event) {
+            event.preventDefault();
+            const query = document.getElementById('searchInput').value.trim();
+            
+            if (!query) {
+                alert('검색어를 입력하세요');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="loading">🔍 검색 중...</div>';
+
+            try {
+                const response = await fetch(`/api/medicines/search/?q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                displayResults(data.results);
+            } catch (error) {
+                resultsDiv.innerHTML = '<div class="no-results">❌ 검색 중 오류가 발생했습니다</div>';
+            }
+        }
+
+        // 음성·수어 영상 목록
+        async function showVideos() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="loading">📹 로딩 중...</div>';
+
+            try {
+                const response = await fetch('/api/medicines/videos/');
+                const data = await response.json();
+                displayResults(data.results, true);
+            } catch (error) {
+                resultsDiv.innerHTML = '<div class="no-results">❌ 로드 중 오류가 발생했습니다</div>';
+            }
+        }
+
+        // 전체 목록
+        async function showAll() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="loading">📋 로딩 중...</div>';
+
+            try {
+                const response = await fetch('/api/medicines/search/?q=');
+                const data = await response.json();
+                displayResults(data.results.slice(0, 50));
+            } catch (error) {
+                resultsDiv.innerHTML = '<div class="no-results">❌ 로드 중 오류가 발생했습니다</div>';
+            }
+        }
+
+        // 결과 표시
+        function displayResults(results, isVideoList = false) {
+            const resultsDiv = document.getElementById('results');
+            
+            if (results.length === 0) {
+                resultsDiv.innerHTML = '<div class="no-results">😢 검색 결과가 없습니다</div>';
+                return;
+            }
+
+            const html = results.map(med => `
+                <div class="medicine-card" onclick="location.href='/api/medicines/detail/${med.item_seq}/'">
+                    ${med.image_url ? `<img src="${med.image_url}" class="pill-image" alt="낱알 이미지">` : ''}
+                    <div class="medicine-name">${med.item_name}</div>
+                    <div class="medicine-company">🏢 ${med.entp_name || '제조사 정보 없음'}</div>
+                    <div class="medicine-effect">${med.effect || '효능 정보 없음'}</div>
+                    <div>
+                        ${med.has_audio ? '<span class="badge video">🎤 음성</span>' : ''}
+                        ${med.video_url ? '<span class="badge video">🎥 수어</span>' : ''}
+                        ${med.image_url ? '<span class="badge pill">💊 낱알정보</span>' : ''}
+                    </div>
+                </div>
+            `).join('');
+
+            resultsDiv.innerHTML = `<div class="results">${html}</div>`;
+        }
+
+        // 페이지 로드 시
+        loadStats();
+    </script>
+</body>
+</html>
