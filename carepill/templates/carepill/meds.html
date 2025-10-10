@@ -1,0 +1,202 @@
+{% extends "carepill/base.html" %}
+{% load static %}
+{% block title %}현재 있는 약 | CarePill{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'carepill/css/meds.css' %}">
+<style>
+  .info-card {
+    background: white;
+    padding: 20px;
+    margin: 15px 0;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    position: relative;
+    transition: transform 0.2s;
+  }
+  .info-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  .info-card h3 {
+    margin-top: 0;
+    color: #2563eb;
+    font-size: 1.3em;
+  }
+  .company {
+    color: #6b7280;
+    font-size: 0.9em;
+    margin: 5px 0;
+  }
+  .dosage-badge {
+    background: #dbeafe;
+    color: #1e40af;
+    padding: 6px 12px;
+    border-radius: 6px;
+    margin: 10px 5px 10px 0;
+    font-weight: 500;
+    display: inline-block;
+    font-size: 0.9em;
+  }
+  .frequency-badge {
+    background: #fef3c7;
+    color: #92400e;
+    padding: 6px 12px;
+    border-radius: 6px;
+    margin: 10px 5px 10px 0;
+    font-weight: 500;
+    display: inline-block;
+    font-size: 0.9em;
+  }
+  .btn-delete {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 0.9em;
+  }
+  .btn-delete:hover {
+    background: #dc2626;
+  }
+  .btn-detail {
+    background: #2563eb;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 0.9em;
+    display: inline-block;
+    margin-top: 15px;
+    font-weight: 500;
+    transition: background 0.2s;
+  }
+  .btn-detail:hover {
+    background: #1d4ed8;
+  }
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #6b7280;
+  }
+  .empty-state h3 {
+    font-size: 1.5em;
+    margin-bottom: 10px;
+  }
+  .primary-btn {
+    background: #2563eb;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    text-decoration: none;
+    display: inline-block;
+    margin-top: 20px;
+    font-weight: 600;
+  }
+  .primary-btn:hover {
+    background: #1d4ed8;
+  }
+  .pill-image {
+    max-width: 80px;
+    max-height: 80px;
+    float: right;
+    margin-left: 15px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+  }
+  .meta-info {
+    font-size: 0.85em;
+    color: #9ca3af;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e5e7eb;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<section class="page-section">
+  <h1 class="page-title">현재 있는 약</h1>
+  <p class="page-desc">보관 중인 약 목록입니다.</p>
+
+  <div class="card-grid">
+    {% if medications %}
+      {% for medication in medications %}
+        <div class="info-card">
+          <a href="/meds/delete/{{ medication.id }}/" 
+              class="btn-delete"
+             onclick="return confirm('{{ medication.medicine.item_name }}을(를) 정말 삭제하시겠습니까?')">
+          </a>
+          
+          {% if medication.medicine.pill_info.image_url %}
+            <img src="{{ medication.medicine.pill_info.image_url }}" 
+                 alt="{{ medication.medicine.item_name }}" 
+                 class="pill-image"
+                 onerror="this.style.display='none'">
+          {% endif %}
+          
+          <h3>{{ medication.medicine.item_name }}</h3>
+          <p class="company">{{ medication.medicine.entp_name }}</p>
+          
+          <div>
+            {% if medication.dosage %}
+              <span class="dosage-badge">💊 {{ medication.dosage }}</span>
+            {% endif %}
+            
+            {% if medication.frequency %}
+              <span class="frequency-badge">🕐 {{ medication.frequency }}</span>
+            {% endif %}
+          </div>
+          
+          <!-- 추가 메타 정보 -->
+          <div class="meta-info">
+            {% if medication.pharmacy_name %}
+              🏥 {{ medication.pharmacy_name }}
+            {% endif %}
+            {% if medication.hospital_name %}
+              • 🏨 {{ medication.hospital_name }}
+            {% endif %}
+            {% if medication.prescription_date %}
+              • 📅 조제일: {{ medication.prescription_date }}
+            {% endif %}
+            <br>
+            등록일: {{ medication.start_date|date:"Y년 m월 d일" }}
+          </div>
+          
+          <!-- 상세 정보 보기 버튼 -->
+          <a href="/meds/detail/{{ medication.id }}/" class="btn-detail">
+            📋 상세 정보 보기
+          </a>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">
+        <h3>📭 아직 등록된 약이 없습니다</h3>
+        <p style="color:#9ca3af; margin: 15px 0;">
+          처방전을 스캔하여 약을 추가해보세요!
+        </p>
+        <a href="/scan/" class="primary-btn">
+          📸 약 스캔하러 가기
+        </a>
+      </div>
+    {% endif %}
+  </div>
+  
+  {% if medications %}
+    <div style="margin-top: 30px; text-align: center;">
+      <a href="/scan/" class="primary-btn">
+        ➕ 약 더 추가하기
+      </a>
+    </div>
+  {% endif %}
+</section>
+
+{% endblock %}

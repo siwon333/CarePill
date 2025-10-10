@@ -1,23 +1,69 @@
+# medicines/views.py
+
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.db.models import Q
-from django.shortcuts import render, get_object_or_404  # 👈 이 줄 추가/수정
-from .models import Medicine, PillIdentification, AccessibilityInfo
-from medicines.models import UserMedication
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib import messages
 from django.contrib.auth.models import User
+from .models import Medicine, PillIdentification, AccessibilityInfo, UserMedication
+
+
+# ============================================
+# 🌐 웹 페이지 뷰 (추가됨)
+# ============================================
+
+def home(request):
+    """홈 페이지"""
+    return render(request, 'medicines/home.html')
+
+
+def scan_page(request):
+    """약 스캔 페이지 (OCR 앱과 연동)"""
+    return render(request, 'medicines/scan.html')
+
+
+def voice_page(request):
+    """음성 인터페이스 페이지"""
+    return render(request, 'medicines/voice.html')
+
 
 def my_medications(request):
-    """내 복용약 목록"""
-    user = User.objects.first()  # 임시
+    """내 복용약 목록 (기존 코드 개선)"""
+    # TODO: 실제 배포 시 request.user 사용
+    try:
+        user = User.objects.first()
+        if not user:
+            user = User.objects.create_user(username='guest', password='guest123')
+    except:
+        messages.error(request, '사용자 정보를 찾을 수 없습니다.')
+        return redirect('medicines:home')
     
     medications = UserMedication.objects.filter(
         user=user,
         is_completed=False
     ).select_related('medicine', 'medicine__pill_info', 'medicine__accessibility')
     
-    return render(request, 'medicines/my_medications.html', {
+    return render(request, 'medicines/meds.html', {
         'medications': medications
     })
+
+
+def delete_medication(request, medication_id):
+    """약 삭제 (새로 추가)"""
+    user = User.objects.first()  # TODO: request.user 사용
+    
+    medication = get_object_or_404(UserMedication, id=medication_id, user=user)
+    medicine_name = medication.medicine.item_name
+    medication.delete()
+    
+    messages.success(request, f'{medicine_name}을(를) 삭제했습니다.')
+    return redirect('medicines:my_medications')
+
+
+# ============================================
+# 🔌 API 엔드포인트 (기존 코드 유지)
+# ============================================
 
 @require_http_methods(["GET"])
 def search_medicine(request):
@@ -59,6 +105,7 @@ def search_medicine(request):
         'count': len(results),
         'results': results
     })
+
 
 @require_http_methods(["GET"])
 def medicine_detail(request, item_seq):
@@ -113,6 +160,7 @@ def medicine_detail(request, item_seq):
     
     return JsonResponse(data)
 
+
 @require_http_methods(["GET"])
 def search_by_barcode(request):
     """바코드로 검색 API"""
@@ -137,6 +185,7 @@ def search_by_barcode(request):
         })
     except AccessibilityInfo.DoesNotExist:
         return JsonResponse({'error': '해당 바코드의 의약품을 찾을 수 없습니다'}, status=404)
+
 
 @require_http_methods(["GET"])
 def search_by_image(request):
@@ -175,6 +224,7 @@ def search_by_image(request):
         'results': results
     })
 
+
 @require_http_methods(["GET"])
 def medicines_with_video(request):
     """음성/수어 영상이 있는 의약품 목록"""
@@ -196,9 +246,11 @@ def medicines_with_video(request):
         'results': results
     })
 
+
 def index(request):
-    """메인 웹 페이지"""
-    return render(request, 'medicines/base.html')
+    """메인 웹 페이지 (홈으로 리다이렉트)"""
+    return redirect('medicines:home')
+
 
 @require_http_methods(["GET"])
 def get_stats(request):
@@ -214,6 +266,7 @@ def get_stats(request):
         'total_videos': total_videos,
         'total_pills': total_pills,
     })
+
 
 def medicine_detail_page(request, item_seq):
     """의약품 상세 페이지 (HTML)"""

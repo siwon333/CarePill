@@ -86,7 +86,7 @@ def fill_empty_fields():
     """빈 필드가 있는 의약품 정보 채우기"""
     
     # effect가 비어있는 의약품들 가져오기
-    empty_medicines = Medicine.objects.filter(effect__isnull=True)  # 처음 50개만 테스트
+    empty_medicines = Medicine.objects.filter(effect__isnull=True)
     
     print(f"📊 빈 필드가 있는 의약품: {empty_medicines.count()}개")
     print("🕷️ 크롤링 시작...\n")
