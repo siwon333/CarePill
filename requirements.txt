@@ -30,3 +30,13 @@ urllib3==2.5.0
 pvporcupine>=3.0.0
 PyAudio>=0.2.14
 python-dotenv>=1.0.0
+
+# Django REST Framework
+djangorestframework==3.14.0
+
+# GPT-SoVITS TTS (Mock - 실제 사용 시 GPT-SoVITS 설치 필요)
+# torch==2.1.2
+# torchaudio==2.1.2
+# librosa==0.10.1
+# soundfile==0.12.1
+# scipy==1.11.4

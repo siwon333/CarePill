@@ -6,7 +6,8 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/medicines/', include('medicines.urls')),
-    path('ocr/', include('ocr.urls')),  # 👈 추가
+    path('ocr/', include('ocr.urls')),
+    path('api/tts/', include('voice_tts.urls')),  # Voice TTS API
 ]
 
 # 미디어 파일 서빙 (개발 환경)

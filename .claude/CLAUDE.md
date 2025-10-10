@@ -142,7 +142,7 @@ Required in `.env`:
 - Implement rate limiting for API endpoints
 - Use Django Debug Toolbar in development
 - Maintain detailed change logs in claudedocs/
-
+- 이모지 쓰지 않기.
 ---
 *Generated: 2025-10-01*
 *Last Updated: 2025-10-01*

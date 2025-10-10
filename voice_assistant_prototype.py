@@ -26,12 +26,16 @@ class Config:
     PORCUPINE_MODEL_PATH = os.getenv('PORCUPINE_MODEL_PATH')
     WAKE_WORD_MODEL_PATH = os.getenv('WAKE_WORD_MODEL_PATH')
 
-    # Naver Clova
+    # Naver Clova (STT only)
     NAVER_CLIENT_ID = os.getenv('NAVER_CLIENT_ID')
     NAVER_CLIENT_SECRET = os.getenv('NAVER_CLIENT_SECRET')
 
     # OpenAI
     OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+
+    # Django TTS API
+    DJANGO_TTS_URL = os.getenv('DJANGO_TTS_URL', 'http://localhost:8000')
+    DJANGO_TTS_TOKEN = os.getenv('DJANGO_TTS_TOKEN', '')
 
     # Audio settings
     SAMPLE_RATE = 16000
@@ -269,12 +273,73 @@ def generate_response(intent, data):
     return response_text
 
 # ============================================================================
-# 5. Text-to-Speech (TTS)
+# 5. Text-to-Speech (TTS) - Django API with Custom Voice
 # ============================================================================
 
 def text_to_speech(text):
-    """Convert text to speech using Naver Clova TTS"""
-    print("[TTS] Converting text to speech...")
+    """Convert text to speech using Django TTS API with custom voice"""
+    print("[TTS] Converting text to speech (custom voice)...")
+
+    # Django TTS API endpoint
+    api_url = f"{Config.DJANGO_TTS_URL}/api/tts/generate/"
+
+    headers = {
+        "Authorization": f"Token {Config.DJANGO_TTS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+
+    data = {
+        "text": text,
+        "use_cache": True,  # Enable caching for faster responses
+        "language": "ko"
+    }
+
+    try:
+        # Call Django TTS API
+        response = requests.post(api_url, json=data, headers=headers)
+
+        if response.status_code == 200:
+            result = response.json()
+
+            if result.get('success'):
+                # Get audio file URL
+                audio_url = f"{Config.DJANGO_TTS_URL}{result['audio_url']}"
+
+                # Download audio file
+                audio_response = requests.get(audio_url)
+
+                if audio_response.status_code == 200:
+                    audio_file = "response_audio.wav"
+                    with open(audio_file, "wb") as f:
+                        f.write(audio_response.content)
+
+                    cache_status = "CACHED" if result.get('cache_hit') else "GENERATED"
+                    print(f"[TTS] Audio saved to {audio_file} ({cache_status})")
+                    print(f"[TTS] Processing time: {result.get('processing_time_ms', 0):.0f}ms")
+
+                    # Play audio (Windows)
+                    import subprocess
+                    subprocess.run(["start", audio_file], shell=True)
+                    return True
+                else:
+                    print(f"[TTS ERROR] Failed to download audio: {audio_response.status_code}")
+                    return text_to_speech_fallback(text)
+            else:
+                error_msg = result.get('error', 'Unknown error')
+                print(f"[TTS ERROR] API error: {error_msg}")
+                return text_to_speech_fallback(text)
+        else:
+            print(f"[TTS ERROR] API request failed: {response.status_code}")
+            return text_to_speech_fallback(text)
+
+    except Exception as e:
+        print(f"[TTS ERROR] Exception: {e}")
+        return text_to_speech_fallback(text)
+
+
+def text_to_speech_fallback(text):
+    """Fallback to Naver TTS if Django API fails"""
+    print("[TTS] Falling back to Naver TTS...")
 
     url = "https://naveropenapi.apigw.ntruss.com/tts-premium/v1/tts"
 
@@ -299,14 +364,14 @@ def text_to_speech(text):
         audio_file = "response_audio.mp3"
         with open(audio_file, "wb") as f:
             f.write(response.content)
-        print(f"[TTS] Audio saved to {audio_file}")
+        print(f"[TTS] Fallback audio saved to {audio_file}")
 
         # Play audio (Windows)
         import subprocess
         subprocess.run(["start", audio_file], shell=True)
         return True
     else:
-        print(f"[TTS ERROR] {response.status_code}: {response.text}")
+        print(f"[TTS ERROR] Fallback also failed: {response.status_code}")
         return False
 
 # ============================================================================
@@ -359,7 +424,7 @@ def main():
         print("\n\n[STOPPED] Voice assistant stopped")
 
         # Cleanup
-        for temp_file in ["temp_recording.wav", "response_audio.mp3"]:
+        for temp_file in ["temp_recording.wav", "response_audio.mp3", "response_audio.wav"]:
             if os.path.exists(temp_file):
                 os.remove(temp_file)
 

@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>음성 샘플 업로드 - CarePill</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            background: #f8f9ff;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: #f0f2ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #764ba2;
+            background: #e8ebff;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        .upload-text {
+            color: #667eea;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .upload-hint {
+            color: #999;
+            font-size: 14px;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-info {
+            background: #f8f9ff;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .file-info.show {
+            display: block;
+        }
+
+        .file-name {
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .file-size {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .requirements {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .requirements h3 {
+            color: #856404;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        .requirements ul {
+            list-style: none;
+            color: #856404;
+        }
+
+        .requirements li {
+            padding: 5px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .requirements li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            font-weight: bold;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 10px;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.2s ease;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .message.show {
+            display: block;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .progress {
+            width: 100%;
+            height: 8px;
+            background: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .progress.show {
+            display: block;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .links {
+            margin-top: 30px;
+            text-align: center;
+        }
+
+        .links a {
+            color: #667eea;
+            text-decoration: none;
+            margin: 0 15px;
+            font-size: 14px;
+        }
+
+        .links a:hover {
+            text-decoration: underline;
+        }
+
+        .current-voice {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .current-voice h3 {
+            color: #0c5460;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        .current-voice p {
+            color: #0c5460;
+            font-size: 14px;
+            margin: 5px 0;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 12px;
+            background: #f8f9ff;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: 600;
+            color: #667eea;
+            transition: all 0.3s ease;
+        }
+
+        .tab:hover {
+            background: #f0f2ff;
+        }
+
+        .tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .record-area {
+            border: 3px solid #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            background: #f8f9ff;
+            margin-bottom: 20px;
+        }
+
+        .record-button {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            font-size: 48px;
+            cursor: pointer;
+            margin: 20px auto;
+            display: block;
+            transition: transform 0.2s ease;
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .record-button:hover {
+            transform: scale(1.05);
+        }
+
+        .record-button:active {
+            transform: scale(0.95);
+        }
+
+        .record-button.recording {
+            animation: pulse 1.5s infinite;
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .record-status {
+            color: #667eea;
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        .record-timer {
+            color: #764ba2;
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .record-hint {
+            color: #999;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .waveform {
+            height: 60px;
+            background: #f8f9ff;
+            border-radius: 10px;
+            margin: 20px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+            padding: 10px;
+        }
+
+        .waveform-bar {
+            width: 4px;
+            background: #667eea;
+            border-radius: 2px;
+            transition: height 0.1s ease;
+        }
+
+        .audio-preview {
+            margin: 20px 0;
+            display: none;
+        }
+
+        .audio-preview.show {
+            display: block;
+        }
+
+        .audio-preview audio {
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        .record-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .record-actions button {
+            flex: 1;
+        }
+
+        .btn-secondary {
+            background: #6c757d !important;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important;
+        }
+
+        .nav-menu {
+            background: #f8f9ff;
+            border: 2px solid #667eea;
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 30px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .nav-menu a {
+            flex: 1;
+            min-width: 140px;
+            padding: 10px 15px;
+            background: white;
+            color: #667eea;
+            text-decoration: none;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 14px;
+            border: 2px solid #667eea;
+            transition: all 0.3s ease;
+        }
+
+        .nav-menu a:hover {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .nav-menu a.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .page-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .page-title h1 {
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav-menu">
+            <a href="/api/tts/upload/" class="active">음성 업로드</a>
+            <a href="/api/medicines/">약물 검색</a>
+            <a href="/ocr/">약 사진 인식</a>
+            <a href="/api/tts/health/">API 상태</a>
+            <a href="/admin/">관리자</a>
+        </div>
+
+        <div class="page-title">
+            <h1>음성 샘플 업로드</h1>
+        </div>
+        <p class="subtitle">나만의 목소리로 TTS를 생성하세요</p>
+
+        {% if current_voice %}
+        <div class="current-voice">
+            <h3>현재 등록된 음성</h3>
+            <p><strong>파일:</strong> {{ current_voice.voice_file.name }}</p>
+            <p><strong>등록일:</strong> {{ current_voice.uploaded_at|date:"Y-m-d H:i" }}</p>
+            <p><strong>상태:</strong> {% if current_voice.is_active %}✅ 활성화{% else %}❌ 비활성화{% endif %}</p>
+        </div>
+        {% endif %}
+
+        <div class="requirements">
+            <h3>📋 음성 샘플 요구사항</h3>
+            <ul>
+                <li>길이: 5~30초</li>
+                <li>포맷: WAV, MP3, M4A, FLAC</li>
+                <li>내용: 명확하게 말하기 (예: "안녕하세요, 저는 ○○○입니다")</li>
+                <li>배경 소음 최소화</li>
+            </ul>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" data-tab="record">🎙️ 직접 녹음</div>
+            <div class="tab" data-tab="upload">📁 파일 업로드</div>
+        </div>
+
+        <div class="message" id="message"></div>
+        <div class="progress" id="progress">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+
+        <!-- 녹음 탭 -->
+        <div class="tab-content active" id="recordTab">
+            <div class="record-area">
+                <button type="button" class="record-button" id="recordBtn">🎤</button>
+                <div class="record-status" id="recordStatus">녹음 버튼을 눌러 시작하세요</div>
+                <div class="record-timer" id="recordTimer">00:00</div>
+                <div class="record-hint">5~30초 사이로 녹음하세요</div>
+
+                <div class="waveform" id="waveform">
+                    <!-- 웨이브폼 바 20개 생성 -->
+                </div>
+            </div>
+
+            <div class="audio-preview" id="audioPreview">
+                <h4 style="color: #667eea; margin-bottom: 10px;">녹음된 음성 미리듣기:</h4>
+                <audio controls id="audioPlayer"></audio>
+
+                <div class="record-actions">
+                    <button type="button" class="btn-secondary" id="rerecordBtn">🔄 다시 녹음</button>
+                    <button type="button" class="btn-success" id="saveRecordBtn">✅ 이 녹음 사용</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 파일 업로드 탭 -->
+        <div class="tab-content" id="uploadTab">
+            <form id="uploadForm" method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">🎙️</div>
+                    <div class="upload-text">클릭하거나 파일을 드래그하세요</div>
+                    <div class="upload-hint">WAV, MP3, M4A, FLAC (최대 10MB)</div>
+                    <input type="file" name="voice_file" id="voiceFile" accept=".wav,.mp3,.m4a,.flac">
+                </div>
+
+                <div class="file-info" id="fileInfo">
+                    <div class="file-name" id="fileName"></div>
+                    <div class="file-size" id="fileSize"></div>
+                </div>
+
+                <button type="submit" id="submitBtn" disabled>업로드</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================================
+        // 공통 요소
+        // ============================================================================
+        const message = document.getElementById('message');
+        const progress = document.getElementById('progress');
+        const progressBar = document.getElementById('progressBar');
+
+        function showMessage(type, text) {
+            message.className = 'message show ' + type;
+            message.textContent = text;
+        }
+
+        function hideMessage() {
+            message.className = 'message';
+        }
+
+        // ============================================================================
+        // 탭 전환
+        // ============================================================================
+        const tabs = document.querySelectorAll('.tab');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.getAttribute('data-tab');
+
+                // 모든 탭 비활성화
+                tabs.forEach(t => t.classList.remove('active'));
+                tabContents.forEach(tc => tc.classList.remove('active'));
+
+                // 선택한 탭 활성화
+                tab.classList.add('active');
+                document.getElementById(tabName + 'Tab').classList.add('active');
+            });
+        });
+
+        // ============================================================================
+        // 녹음 기능
+        // ============================================================================
+        let mediaRecorder;
+        let audioChunks = [];
+        let recordingTimer;
+        let recordingSeconds = 0;
+        let recordedBlob = null;
+
+        const recordBtn = document.getElementById('recordBtn');
+        const recordStatus = document.getElementById('recordStatus');
+        const recordTimer = document.getElementById('recordTimer');
+        const audioPreview = document.getElementById('audioPreview');
+        const audioPlayer = document.getElementById('audioPlayer');
+        const rerecordBtn = document.getElementById('rerecordBtn');
+        const saveRecordBtn = document.getElementById('saveRecordBtn');
+        const waveform = document.getElementById('waveform');
+
+        // 웨이브폼 바 생성
+        for (let i = 0; i < 20; i++) {
+            const bar = document.createElement('div');
+            bar.className = 'waveform-bar';
+            bar.style.height = '10px';
+            waveform.appendChild(bar);
+        }
+
+        recordBtn.addEventListener('click', toggleRecording);
+        rerecordBtn.addEventListener('click', resetRecording);
+        saveRecordBtn.addEventListener('click', uploadRecording);
+
+        async function toggleRecording() {
+            if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+                await startRecording();
+            } else {
+                stopRecording();
+            }
+        }
+
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                recordingSeconds = 0;
+
+                mediaRecorder.addEventListener('dataavailable', event => {
+                    audioChunks.push(event.data);
+                });
+
+                mediaRecorder.addEventListener('stop', () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    recordedBlob = audioBlob;
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    audioPlayer.src = audioUrl;
+                    audioPreview.classList.add('show');
+
+                    // 스트림 중지
+                    stream.getTracks().forEach(track => track.stop());
+                });
+
+                mediaRecorder.start();
+                recordBtn.classList.add('recording');
+                recordBtn.textContent = '⏹️';
+                recordStatus.textContent = '녹음 중... 버튼을 다시 눌러 중지';
+                recordStatus.style.color = '#ff6b6b';
+
+                // 타이머 시작
+                recordingTimer = setInterval(() => {
+                    recordingSeconds++;
+                    const mins = Math.floor(recordingSeconds / 60);
+                    const secs = recordingSeconds % 60;
+                    recordTimer.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+                    // 웨이브폼 애니메이션
+                    const bars = waveform.querySelectorAll('.waveform-bar');
+                    bars.forEach(bar => {
+                        const height = Math.random() * 40 + 10;
+                        bar.style.height = height + 'px';
+                    });
+
+                    // 30초 자동 종료
+                    if (recordingSeconds >= 30) {
+                        stopRecording();
+                        showMessage('success', '최대 녹음 시간 30초에 도달했습니다.');
+                    }
+                }, 1000);
+
+            } catch (error) {
+                showMessage('error', '마이크 접근 권한이 필요합니다: ' + error.message);
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                clearInterval(recordingTimer);
+                recordBtn.classList.remove('recording');
+                recordBtn.textContent = '🎤';
+                recordStatus.textContent = '녹음 완료! 미리듣기 후 저장하세요';
+                recordStatus.style.color = '#667eea';
+
+                // 웨이브폼 초기화
+                const bars = waveform.querySelectorAll('.waveform-bar');
+                bars.forEach(bar => {
+                    bar.style.height = '10px';
+                });
+
+                // 5초 미만 경고
+                if (recordingSeconds < 5) {
+                    showMessage('error', '⚠️ 녹음이 너무 짧습니다. 최소 5초 이상 녹음하세요.');
+                } else {
+                    hideMessage();
+                }
+            }
+        }
+
+        function resetRecording() {
+            audioPreview.classList.remove('show');
+            recordTimer.textContent = '00:00';
+            recordingSeconds = 0;
+            recordedBlob = null;
+            recordStatus.textContent = '녹음 버튼을 눌러 시작하세요';
+            recordStatus.style.color = '#667eea';
+            hideMessage();
+        }
+
+        async function uploadRecording() {
+            if (!recordedBlob) {
+                showMessage('error', '녹음된 파일이 없습니다.');
+                return;
+            }
+
+            if (recordingSeconds < 5) {
+                showMessage('error', '녹음 시간이 너무 짧습니다. 최소 5초 이상 녹음하세요.');
+                return;
+            }
+
+            // FormData 생성
+            const formData = new FormData();
+            const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            formData.append('csrfmiddlewaretoken', csrf);
+            formData.append('voice_file', recordedBlob, 'recorded_voice.wav');
+
+            // 업로드
+            progress.classList.add('show');
+            progressBar.style.width = '0%';
+
+            try {
+                let progressValue = 0;
+                const progressInterval = setInterval(() => {
+                    progressValue += 10;
+                    if (progressValue <= 90) {
+                        progressBar.style.width = progressValue + '%';
+                    }
+                }, 100);
+
+                const response = await fetch(window.location.href, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                clearInterval(progressInterval);
+                progressBar.style.width = '100%';
+
+                if (response.ok) {
+                    showMessage('success', '✅ 음성이 성공적으로 업로드되었습니다! 페이지를 새로고침합니다...');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                } else {
+                    const data = await response.json();
+                    showMessage('error', '❌ 업로드 실패: ' + (data.error || '알 수 없는 오류'));
+                }
+            } catch (error) {
+                showMessage('error', '❌ 업로드 중 오류: ' + error.message);
+            }
+
+            progress.classList.remove('show');
+        }
+
+        // ============================================================================
+        // 파일 업로드 기능
+        // ============================================================================
+        const uploadArea = document.getElementById('uploadArea');
+        const voiceFile = document.getElementById('voiceFile');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const submitBtn = document.getElementById('submitBtn');
+        const uploadForm = document.getElementById('uploadForm');
+
+        // Click to upload
+        uploadArea.addEventListener('click', () => {
+            voiceFile.click();
+        });
+
+        // Drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                voiceFile.files = files;
+                handleFileSelect(files[0]);
+            }
+        });
+
+        // File selection
+        voiceFile.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileSelect(e.target.files[0]);
+            }
+        });
+
+        function handleFileSelect(file) {
+            // Show file info
+            fileName.textContent = file.name;
+            fileSize.textContent = formatFileSize(file.size);
+            fileInfo.classList.add('show');
+
+            // Validate file
+            const validTypes = ['audio/wav', 'audio/mpeg', 'audio/mp3', 'audio/mp4', 'audio/x-m4a', 'audio/flac'];
+            const validExtensions = ['.wav', '.mp3', '.m4a', '.flac'];
+            const ext = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+
+            if (!validExtensions.includes(ext)) {
+                showMessage('error', '지원하지 않는 파일 형식입니다. WAV, MP3, M4A, FLAC만 가능합니다.');
+                submitBtn.disabled = true;
+                return;
+            }
+
+            if (file.size > 10 * 1024 * 1024) {
+                showMessage('error', '파일 크기가 너무 큽니다. 10MB 이하로 업로드하세요.');
+                submitBtn.disabled = true;
+                return;
+            }
+
+            // Enable submit button
+            submitBtn.disabled = false;
+            hideMessage();
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        // Form submission
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            if (!voiceFile.files.length) {
+                showMessage('error', '파일을 선택하세요.');
+                return;
+            }
+
+            // Show progress
+            progress.classList.add('show');
+            progressBar.style.width = '0%';
+            submitBtn.disabled = true;
+
+            const formData = new FormData(uploadForm);
+
+            try {
+                // Simulate progress
+                let progressValue = 0;
+                const progressInterval = setInterval(() => {
+                    progressValue += 10;
+                    if (progressValue <= 90) {
+                        progressBar.style.width = progressValue + '%';
+                    }
+                }, 100);
+
+                const response = await fetch(window.location.href, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                clearInterval(progressInterval);
+                progressBar.style.width = '100%';
+
+                if (response.ok) {
+                    showMessage('success', '✅ 음성 샘플이 성공적으로 업로드되었습니다! 페이지를 새로고침합니다...');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                } else {
+                    const data = await response.json();
+                    showMessage('error', '❌ 업로드 실패: ' + (data.error || '알 수 없는 오류'));
+                    submitBtn.disabled = false;
+                }
+            } catch (error) {
+                showMessage('error', '❌ 업로드 중 오류가 발생했습니다: ' + error.message);
+                submitBtn.disabled = false;
+            }
+
+            progress.classList.remove('show');
+        });
+    </script>
+</body>
+</html>

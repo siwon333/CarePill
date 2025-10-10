@@ -36,8 +36,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',  # Django REST Framework
+    'rest_framework.authtoken',  # Token Authentication
     'medicines',
     'ocr',
+    'voice_tts',  # Voice TTS App
 ]
 
 MIDDLEWARE = [
@@ -132,3 +135,19 @@ OPENAI_API_KEY = local_settings.OPENAI_API_KEY
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Django REST Framework 설정
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.TokenAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+    ],
+}
+
+# GPT-SoVITS TTS 설정
+import os
+GPTSOVITS_MODEL_PATH = os.getenv('GPTSOVITS_MODEL_PATH', str(BASE_DIR / 'models' / 'gpt-sovits-v2'))
+GPTSOVITS_DEVICE = os.getenv('GPTSOVITS_DEVICE', 'cpu')  # 'cuda' for GPU
