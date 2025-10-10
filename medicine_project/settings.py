@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'medicines',
     'ocr',
+    'carepill',
 ]
 
 MIDDLEWARE = [
@@ -55,7 +56,9 @@ ROOT_URLCONF = 'medicine_project.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [
+            BASE_DIR / 'carepill' / 'templates',  # ⭐ 추가
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
