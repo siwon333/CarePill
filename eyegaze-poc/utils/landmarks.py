@@ -1,42 +1,126 @@
+"""
+얼굴 랜드마크 기반 EAR 및 시선 계산
+"""
 import numpy as np
 
-# MediaPipe FaceMesh indices (left/right)
-LEFT_EYE_IDX = [33,133,159,158,153,145]   # p1,p4,p2,p3,p5,p6
-RIGHT_EYE_IDX = [362,263,386,385,380,374]
+# MediaPipe Face Mesh 인덱스
+LEFT_EYE_INDICES = [33, 160, 158, 133, 153, 144]
+RIGHT_EYE_INDICES = [362, 385, 387, 263, 373, 380]
 
-# Corners for normalization
-LEFT_HORIZONTAL = (33,133)
-RIGHT_HORIZONTAL = (362,263)
+LEFT_IRIS_INDICES = [468, 469, 470, 471, 472]
+RIGHT_IRIS_INDICES = [473, 474, 475, 476, 477]
 
-IRIS_CENTER = (468, 473)  # left, right
 
-def _pt(lms, i, w, h):
-    lm = lms[i]
-    return np.array([lm.x*w, lm.y*h], dtype=np.float32)
+def get_eye_landmarks(landmarks, eye='left', w=1, h=1):
+    """
+    눈 랜드마크 좌표 추출
+    
+    Args:
+        landmarks: MediaPipe landmarks
+        eye: 'left' or 'right'
+        w, h: 프레임 크기
+    
+    Returns:
+        List of (x, y) tuples
+    """
+    indices = LEFT_EYE_INDICES if eye == 'left' else RIGHT_EYE_INDICES
+    points = []
+    
+    for idx in indices:
+        lm = landmarks[idx]
+        x = int(lm.x * w)
+        y = int(lm.y * h)
+        points.append((x, y))
+    
+    return points
 
-def eye_ear(lms, w, h, left=True):
-    idx = LEFT_EYE_IDX if left else RIGHT_EYE_IDX
-    p1,p4,p2,p3,p5,p6 = [_pt(lms, i, w, h) for i in idx]
-    num = np.linalg.norm(p2 - p6) + np.linalg.norm(p3 - p5)
-    den = 2.0*np.linalg.norm(p1 - p4) + 1e-6
-    return float(num / den)
 
-def np_l2(a,b): return np.linalg.norm(a-b)
+def compute_ear(eye_points):
+    """
+    Eye Aspect Ratio 계산
+    
+    Args:
+        eye_points: 6개의 눈 좌표 [(x,y), ...]
+    
+    Returns:
+        EAR 값 (0.0 ~ 1.0, 낮을수록 눈 감김)
+    """
+    if len(eye_points) < 6:
+        return 0.0
+    
+    # 수직 거리
+    v1 = np.linalg.norm(np.array(eye_points[1]) - np.array(eye_points[5]))
+    v2 = np.linalg.norm(np.array(eye_points[2]) - np.array(eye_points[4]))
+    
+    # 수평 거리
+    h = np.linalg.norm(np.array(eye_points[0]) - np.array(eye_points[3]))
+    
+    if h == 0:
+        return 0.0
+    
+    ear = (v1 + v2) / (2.0 * h)
+    return ear
 
-def iris_norm_xy(lms, w, h, left=True):
-    # normalize iris center into eye-local coords (-1..1)
-    iris_idx = IRIS_CENTER[0] if left else IRIS_CENTER[1]
-    c = _pt(lms, iris_idx, w, h)
-    a = _pt(lms, LEFT_HORIZONTAL[0] if left else RIGHT_HORIZONTAL[0], w, h)
-    b = _pt(lms, LEFT_HORIZONTAL[1] if left else RIGHT_HORIZONTAL[1], w, h)
-    # x: along the eye width
-    nx = 2 * (c[0] - a[0]) / (np_l2(b, a) + 1e-6) - 1.0
-    # y: eyelid band normalization
-    if left:
-        upper = (_pt(lms,159,w,h)+_pt(lms,158,w,h))/2
-        lower = (_pt(lms,153,w,h)+_pt(lms,145,w,h))/2
-    else:
-        upper = (_pt(lms,386,w,h)+_pt(lms,385,w,h))/2
-        lower = (_pt(lms,380,w,h)+_pt(lms,374,w,h))/2
-    ny = 2 * (c[1] - upper[1]) / ( (lower[1]-upper[1]) + 1e-6 ) - 1.0
-    return float(nx), float(ny)
+
+def compute_gaze(landmarks, eye='left', w=1, h=1, calibration=None):
+    """
+    정규화된 시선 좌표 계산
+    
+    Args:
+        landmarks: MediaPipe landmarks
+        eye: 'left' or 'right'
+        w, h: 프레임 크기
+        calibration: 캘리브레이션 데이터 (선택)
+    
+    Returns:
+        (nx, ny) 정규화 시선 좌표
+    """
+    # 눈 외곽 및 홍채 중심
+    eye_indices = LEFT_EYE_INDICES if eye == 'left' else RIGHT_EYE_INDICES
+    iris_indices = LEFT_IRIS_INDICES if eye == 'left' else RIGHT_IRIS_INDICES
+    
+    # 눈 중심
+    eye_center = np.mean([(landmarks[i].x, landmarks[i].y) for i in eye_indices], axis=0)
+    
+    # 홍채 중심
+    iris_center = np.mean([(landmarks[i].x, landmarks[i].y) for i in iris_indices], axis=0)
+    
+    # 상대 이동 (정규화)
+    dx = iris_center[0] - eye_center[0]
+    dy = iris_center[1] - eye_center[1]
+    
+    # 스케일 조정 (경험적 값)
+    nx = dx * 20  # X축 이동 증폭
+    ny = dy * 15  # Y축 이동 증폭
+    
+    # 캘리브레이션 보정
+    if calibration:
+        center_x, center_y = calibration.get('center', (0, 0))
+        nx -= center_x
+        ny -= center_y
+    
+    return (float(nx), float(ny))
+
+
+def get_iris_landmarks(landmarks, eye='left', w=1, h=1):
+    """
+    홍채 랜드마크 좌표 추출
+    
+    Args:
+        landmarks: MediaPipe landmarks
+        eye: 'left' or 'right'
+        w, h: 프레임 크기
+    
+    Returns:
+        List of (x, y) tuples
+    """
+    indices = LEFT_IRIS_INDICES if eye == 'left' else RIGHT_IRIS_INDICES
+    points = []
+    
+    for idx in indices:
+        lm = landmarks[idx]
+        x = int(lm.x * w)
+        y = int(lm.y * h)
+        points.append((x, y))
+    
+    return points

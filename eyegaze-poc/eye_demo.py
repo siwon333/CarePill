@@ -1,337 +1,232 @@
-# eye_demo.py — full version (top indicator with per-eye dots + smoothing)
-import argparse, time, math
-from collections import deque
-
+#!/usr/bin/env python3
+"""
+실시간 Eye Tracking 데모 (개선 버전)
+- 가까운 거리에서도 안정적인 추적
+- 낮은 임계값 + 이전 프레임 활용
+"""
 import cv2
-import numpy as np
 import mediapipe as mp
-
-from utils.landmarks import eye_ear, iris_norm_xy
-from utils.filters import EMA
-from utils.io import log_csv_open, load_calib, now_ms
+import numpy as np
+import argparse
+import time
+from pathlib import Path
+from utils.landmarks import compute_ear, compute_gaze, get_eye_landmarks
+from utils.filters import EMAFilter
+from utils.io import load_calibration, save_log
 
 mp_face_mesh = mp.solutions.face_mesh
 
-# -----------------------------
-# Colors
-# -----------------------------
-COL_OPEN = (0, 200, 0)
-COL_CLOSED = (0, 0, 255)
-COL_TXT = (255, 255, 255)
-COL_HINT = (200, 200, 200)
-COL_HINT2 = (180, 180, 180)
-COL_GAUGE_FG = (0, 200, 255)
-COL_GAUGE_BG = (40, 40, 40)
-COL_GAUGE_BD = (200, 200, 200)
+class RobustEyeTracker:
+    """안정적인 눈 추적기"""
+    def __init__(self, min_confidence=0.3):
+        self.face_mesh = mp_face_mesh.FaceMesh(
+            max_num_faces=1,
+            refine_landmarks=True,
+            min_detection_confidence=min_confidence,
+            min_tracking_confidence=min_confidence,
+        )
+        self.last_valid_landmarks = None
+        self.lost_frames = 0
+        self.max_lost_frames = 30  # 1초 정도 버팀
+        
+    def process(self, frame):
+        """프레임 처리 with fallback"""
+        results = self.face_mesh.process(frame)
+        
+        if results.multi_face_landmarks:
+            self.last_valid_landmarks = results.multi_face_landmarks[0].landmark
+            self.lost_frames = 0
+            return results.multi_face_landmarks[0].landmark
+        else:
+            self.lost_frames += 1
+            # 최근에 본 적 있으면 이전 값 활용
+            if self.last_valid_landmarks and self.lost_frames < self.max_lost_frames:
+                return self.last_valid_landmarks
+            return None
+    
+    def get_tracking_quality(self):
+        """추적 품질 반환 (0.0~1.0)"""
+        if self.lost_frames == 0:
+            return 1.0
+        return max(0.0, 1.0 - self.lost_frames / self.max_lost_frames)
 
-COL_L = (0, 0, 255)      # left eye dot = red
-COL_R = (255, 0, 0)      # right eye dot = blue
-COL_TRAIL = (120, 120, 120)
-COL_LM = (0, 255, 255)   # yellow landmark dots
 
-# -----------------------------
-# HUD helpers
-# -----------------------------
-def color_for_state(state: str):
-    return COL_OPEN if state == "open" else COL_CLOSED
-
-def put_text(img, text, org, scale=0.8, color=COL_TXT, thick=2):
-    cv2.putText(img, text, org, cv2.FONT_HERSHEY_SIMPLEX, scale, color, thick, cv2.LINE_AA)
-
-def draw_bar(img, x, y, w, h, value01, bg=COL_GAUGE_BG, fg=COL_GAUGE_FG, border=COL_GAUGE_BD):
-    v = max(0.0, min(1.0, float(value01)))
-    cv2.rectangle(img, (x, y), (x + w, y + h), border, 1)
-    cv2.rectangle(img, (x + 1, y + 1), (x + w - 1, y + h - 1), bg, -1)
-    fill = int((w - 2) * v)
-    cv2.rectangle(img, (x + 1, y + 1), (x + 1 + fill, y + h - 1), fg, -1)
-
-def draw_plus_indicator(img, center, size=60, dots=None, trails=None):
-    """
-    center: (cx, cy)
-    dots:   [(dx,dy,color), ...]  where dx,dy are -1..+1 velocity-like values
-    trails: [deque([(dx,dy), ...]), ...]
-    """
-    cx, cy = int(center[0]), int(center[1])
-    # green '+' axes
-    cv2.line(img, (cx - size, cy), (cx + size, cy), (0, 200, 0), 2)
-    cv2.line(img, (cx, cy - size), (cx, cy + size), (0, 200, 0), 2)
-
-    # trails (faint)
-    if trails:
-        for dq in trails:
-            if not dq:
-                continue
-            n = len(dq)
-            for i, (tx, ty) in enumerate(dq):
-                x = int(cx + tx * size)
-                y = int(cy + ty * size)
-                a = 0.35 + 0.65 * (i + 1) / n
-                col = (int(COL_TRAIL[0] * a), int(COL_TRAIL[1] * a), int(COL_TRAIL[2] * a))
-                cv2.circle(img, (x, y), 3, col, -1)
-
-    # current dots
-    if dots:
-        for dx, dy, col in dots:
-            x = int(cx + dx * size)
-            y = int(cy + dy * size)
-            cv2.circle(img, (x, y), 6, col, -1)
-
-def clamp_vec(x, y, limit=0.4):
-    m = math.hypot(x, y)
-    if m > limit and m > 1e-6:
-        s = limit / m
-        return x * s, y * s
-    return x, y
-
-# -----------------------------
-# Main
-# -----------------------------
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--cam", type=int, default=0)
-    ap.add_argument("--alpha", type=float, default=0.5)        # EMA for EAR
-    ap.add_argument("--tau_low", type=float, default=0.20)     # close threshold
-    ap.add_argument("--tau_high", type=float, default=0.24)    # open threshold
-    ap.add_argument("--user", type=str, default="default")     # calibration profile
-    ap.add_argument("--width", type=int, default=1280)
-    ap.add_argument("--height", type=int, default=720)
-    ap.add_argument("--save", action="store_true")             # CSV logging
-    ap.add_argument("--show-points", action="store_true")      # yellow eye/iris debug dots
-    ap.add_argument("--flip-x", action="store_true", help="mirror/selfie camera: +X is right")
-    ap.add_argument("--flip-y", action="store_true", help="flip Y if you want +Y to be up")
-    ap.add_argument("--two-cross", action="store_true", help="draw two '+' indicators: left & right")
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--flip-x', action='store_true', help='X축 반전(셀피 카메라)')
+    parser.add_argument('--flip-y', action='store_true', help='Y축 반전')
+    parser.add_argument('--two-cross', action='store_true', help='양쪽 눈 인디케이터')
+    parser.add_argument('--save', action='store_true', help='CSV 로그 저장')
+    parser.add_argument('--show-points', action='store_true', help='랜드마크 표시')
+    parser.add_argument('--width', type=int, default=1280, help='카메라 해상도 너비')
+    parser.add_argument('--height', type=int, default=720, help='카메라 해상도 높이')
+    parser.add_argument('--pos-smooth', type=float, default=0.7, help='위치 스무딩')
+    parser.add_argument('--vel-smooth', type=float, default=0.3, help='속도 스무딩')
+    parser.add_argument('--deadzone', type=float, default=0.05, help='데드존')
+    parser.add_argument('--dot-gain', type=float, default=0.8, help='점 이동 배율')
+    parser.add_argument('--min-confidence', type=float, default=0.3, help='최소 감지 신뢰도')
+    args = parser.parse_args()
 
-    # smoothing / taming options
-    ap.add_argument("--pos-smooth", type=float, default=0.90, help="gaze coord EMA (0~1, higher = smoother)")
-    ap.add_argument("--vel-smooth", type=float, default=0.20, help="velocity EMA (0~1, lower = smoother)")
-    ap.add_argument("--deadzone",   type=float, default=0.06, help="ignore small motions under this (norm units)")
-    ap.add_argument("--dot-gain",   type=float, default=0.6,  help="scale for indicator dot velocity")
-    args = ap.parse_args()
-
-    cap = cv2.VideoCapture(args.cam)
-    if args.width:
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, args.width)
-    if args.height:
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, args.height)
-    cap.set(cv2.CAP_PROP_FPS, 60)
-
-    # logging
-    f = None
-    writer = None
-    if args.save:
-        f, writer = log_csv_open("eye")
-
-    # EAR state
-    ema_ear = EMA(args.alpha)
-    eye_state = "open"
-    blink_t0 = None
-
-    # calibration
-    calib = load_calib(args.user)
-    biasx = float(calib.get("biasx", 0.0))
-    biasy = float(calib.get("biasy", 0.0))
-    gainx = float(calib.get("gainx", 1.0))
-    gainy = float(calib.get("gainy", 1.0))
-
-    # FPS
-    fps_t0 = time.time()
-    fps_cnt = 0
-    fps = 0.0
-
-    # per-eye filtered coords (EMA)
-    nx_l_f = ny_l_f = None
-    nx_r_f = ny_r_f = None
-
-    # per-eye velocity/trails
-    prev_l = None
-    prev_r = None
-    vx_l = vy_l = 0.0
-    vx_r = vy_r = 0.0
-    trail_l = deque(maxlen=6)
-    trail_r = deque(maxlen=6)
-
-    with mp_face_mesh.FaceMesh(
-        max_num_faces=1,
-        refine_landmarks=True,   # enable iris
-        min_detection_confidence=0.6,
-        min_tracking_confidence=0.6
-    ) as face:
-
-        while True:
-            ok, frame = cap.read()
-            if not ok:
-                break
-
-            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            res = face.process(rgb)
+    # 캘리브레이션 로드
+    calib = load_calibration('default')
+    
+    # 카메라 설정
+    cap = cv2.VideoCapture(0)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, args.width)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, args.height)
+    cap.set(cv2.CAP_PROP_FPS, 30)
+    
+    # 실제 해상도 확인
+    actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    print(f"카메라 해상도: {actual_w}x{actual_h}")
+    
+    # 트래커 및 필터 초기화
+    tracker = RobustEyeTracker(min_confidence=args.min_confidence)
+    filter_left = EMAFilter(alpha_pos=args.pos_smooth, alpha_vel=args.vel_smooth, deadzone=args.deadzone)
+    filter_right = EMAFilter(alpha_pos=args.pos_smooth, alpha_vel=args.vel_smooth, deadzone=args.deadzone)
+    
+    # 로그 저장
+    log_data = [] if args.save else None
+    
+    # 상단 인디케이터 설정
+    indicator_h = 60
+    dot_l_x, dot_l_y = actual_w // 4, indicator_h // 2
+    dot_r_x, dot_r_y = 3 * actual_w // 4, indicator_h // 2
+    
+    blink_count = 0
+    last_blink_time = 0
+    
+    print("\n=== Eye Tracking 시작 ===")
+    print(f"- 해상도: {actual_w}x{actual_h}")
+    print(f"- 최소 신뢰도: {args.min_confidence}")
+    print(f"- 스무딩: pos={args.pos_smooth}, vel={args.vel_smooth}")
+    print("- ESC 키로 종료\n")
+    
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        
+        # RGB 변환
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        
+        # 얼굴 감지
+        landmarks = tracker.process(rgb)
+        quality = tracker.get_tracking_quality()
+        
+        # 상단 인디케이터 영역 생성
+        indicator = np.ones((indicator_h, actual_w, 3), dtype=np.uint8) * 40
+        
+        if landmarks is not None:
             h, w = frame.shape[:2]
-
-            blink_event = 0
-            blink_ms = 0
-
-            nx = ny = 0.0           # average (text)
-            nx_l = ny_l = 0.0       # left eye raw norm gaze
-            nx_r = ny_r = 0.0       # right eye raw norm gaze
-            ear_val = float(ema_ear.v or 0.0)
-
-            if res.multi_face_landmarks:
-                lms = res.multi_face_landmarks[0].landmark
-
-                # --- EAR ---
-                ear_left = eye_ear(lms, w, h, left=True)
-                ear_right = eye_ear(lms, w, h, left=False)
-                ear = ema_ear.update(0.5 * (ear_left + ear_right))
-                ear_val = float(ear if ear is not None else 0.0)
-
-                # hysteresis for blink
-                if eye_state == "open" and ear_val < args.tau_low:
-                    eye_state = "closed"
-                    blink_t0 = now_ms()
-                elif eye_state == "closed" and ear_val > args.tau_high:
-                    eye_state = "open"
-                    if blink_t0 is not None:
-                        blink_event = 1
-                        blink_ms = now_ms() - blink_t0
-                        blink_t0 = None
-
-                # --- per-eye gaze (normalized -1..+1) ---
-                nx_l, ny_l = iris_norm_xy(lms, w, h, left=True)
-                nx_r, ny_r = iris_norm_xy(lms, w, h, left=False)
-
-                # calibration
-                nx_l = (nx_l + biasx) * gainx
-                ny_l = (ny_l + biasy) * gainy
-                nx_r = (nx_r + biasx) * gainx
-                ny_r = (ny_r + biasy) * gainy
-
-                # flips
-                if args.flip_x:
-                    nx_l, nx_r = -nx_l, -nx_r
-                if args.flip_y:
-                    ny_l, ny_r = -ny_l, -ny_r
-
-                # ===== ① position smoothing (EMA) =====
-                a = float(args.pos_smooth)  # higher -> smoother
-                def ema(prev, x): return x if prev is None else a*prev + (1-a)*x
-                nx_l_f = ema(nx_l_f, nx_l); ny_l_f = ema(ny_l_f, ny_l)
-                nx_r_f = ema(nx_r_f, nx_r); ny_r_f = ema(ny_r_f, ny_r)
-
-                # average for display text
-                nx = (nx_l_f + nx_r_f) / 2.0
-                ny = (ny_l_f + ny_r_f) / 2.0
-
-                # ===== ② velocity from filtered coords =====
-                if prev_l is None:
-                    dnx_l = dny_l = 0.0
-                else:
-                    plx, ply = prev_l
-                    dnx_l, dny_l = nx_l_f - plx, ny_l_f - ply
-                prev_l = (nx_l_f, ny_l_f)
-
-                if prev_r is None:
-                    dnx_r = dny_r = 0.0
-                else:
-                    prx, pry = prev_r
-                    dnx_r, dny_r = nx_r_f - prx, ny_r_f - pry
-                prev_r = (nx_r_f, ny_r_f)
-
-                # ===== ③ velocity EMA + deadzone + gain + clamp =====
-                b = float(args.vel_smooth)   # lower -> smoother (0.2 default)
-                def ema_vel(prev, d): return b*d + (1-b)*prev
-                vx_l = ema_vel(vx_l, dnx_l);  vy_l = ema_vel(vy_l, dny_l)
-                vx_r = ema_vel(vx_r, dnx_r);  vy_r = ema_vel(vy_r, dny_r)
-
-                dz = float(args.deadzone)
-                def apply_deadzone(x, y, dz):
-                    if abs(x) < dz: x = 0.0
-                    if abs(y) < dz: y = 0.0
-                    return x, y
-                vx_l, vy_l = apply_deadzone(vx_l, vy_l, dz)
-                vx_r, vy_r = apply_deadzone(vx_r, vy_r, dz)
-
-                g = float(args.dot_gain)
-                vx_l *= g; vy_l *= g
-                vx_r *= g; vy_r *= g
-
-                vx_l, vy_l = clamp_vec(vx_l, vy_l, limit=0.25)
-                vx_r, vy_r = clamp_vec(vx_r, vy_r, limit=0.25)
-
-                # trails
-                trail_l.append((vx_l, vy_l))
-                trail_r.append((vx_r, vy_r))
-
-                # optional: draw a few eye/iris landmarks as yellow dots
-                if args.show_points:
-                    def _pt_xy(lm): 
-                        return int(lm.x * w), int(lm.y * h)
-                    for i in [33,133,159,158,153,145, 362,263,386,385,380,374, 468,473]:
-                        x, y = _pt_xy(lms[i])
-                        cv2.circle(frame, (x, y), 1, COL_LM, -1)
-
-            # ============= HUD =============
-            # EAR text
-            col = color_for_state(eye_state)
-            put_text(frame, f"EAR: {ear_val:.3f} [{eye_state}]", (18, 40), 0.9, col, 2)
-            put_text(frame, f"gaze nx,ny=({nx:+.2f},{ny:+.2f})", (18, 75), 0.8, (255, 255, 0), 2)
-
-            # EAR gauge (top-right)
-            ear_min, ear_max = 0.10, 0.35
-            ear01 = (ear_val - ear_min) / (ear_max - ear_min + 1e-6)
-            ear01 = max(0.0, min(1.0, ear01))
-            bar_w, bar_h = 240, 18
-            draw_bar(frame, frame.shape[1] - bar_w - 20, 20, bar_w, bar_h, ear01)
-
-            # top indicator(s)
+            
+            # 왼쪽 눈
+            left_pts = get_eye_landmarks(landmarks, 'left', w, h)
+            ear_left = compute_ear(left_pts)
+            gaze_left = compute_gaze(landmarks, 'left', w, h, calib)
+            nx_l, ny_l = gaze_left
+            
+            # 오른쪽 눈
+            right_pts = get_eye_landmarks(landmarks, 'right', w, h)
+            ear_right = compute_ear(right_pts)
+            gaze_right = compute_gaze(landmarks, 'right', w, h, calib)
+            nx_r, ny_r = gaze_right
+            
+            # X/Y 축 반전
+            if args.flip_x:
+                nx_l, nx_r = -nx_l, -nx_r
+            if args.flip_y:
+                ny_l, ny_r = -ny_l, -ny_r
+            
+            # 필터 적용
+            fx_l, fy_l = filter_left.update(nx_l, ny_l)
+            fx_r, fy_r = filter_right.update(nx_r, ny_r)
+            
+            # 인디케이터 점 위치
+            dot_l_x = int(actual_w // 4 + fx_l * args.dot_gain * 200)
+            dot_l_y = int(indicator_h // 2 - fy_l * args.dot_gain * 20)
+            dot_l_x = np.clip(dot_l_x, 10, actual_w // 2 - 10)
+            dot_l_y = np.clip(dot_l_y, 10, indicator_h - 10)
+            
+            dot_r_x = int(3 * actual_w // 4 + fx_r * args.dot_gain * 200)
+            dot_r_y = int(indicator_h // 2 - fy_r * args.dot_gain * 20)
+            dot_r_x = np.clip(dot_r_x, actual_w // 2 + 10, actual_w - 10)
+            dot_r_y = np.clip(dot_r_y, 10, indicator_h - 10)
+            
+            # 깜빡임 감지
+            avg_ear = (ear_left + ear_right) / 2
+            if avg_ear < 0.2:
+                current_time = time.time()
+                if current_time - last_blink_time > 0.3:
+                    blink_count += 1
+                    last_blink_time = current_time
+            
+            # 인디케이터 그리기
+            cv2.circle(indicator, (dot_l_x, dot_l_y), 8, (0, 255, 0), -1)
+            cv2.circle(indicator, (dot_r_x, dot_r_y), 8, (0, 255, 255), -1)
+            
             if args.two_cross:
-                ind_L = (frame.shape[1] // 2 - 120, 80)
-                ind_R = (frame.shape[1] // 2 + 120, 80)
-                draw_plus_indicator(frame, ind_L, size=55,
-                                    dots=[(vx_l, vy_l, COL_L)],
-                                    trails=[trail_l])
-                draw_plus_indicator(frame, ind_R, size=55,
-                                    dots=[(vx_r, vy_r, COL_R)],
-                                    trails=[trail_r])
-                put_text(frame, "L", (ind_L[0] - 65, ind_L[1] - 65), 0.9, COL_HINT, 2)
-                put_text(frame, "R", (ind_R[0] - 65, ind_R[1] - 65), 0.9, COL_HINT, 2)
-            else:
-                ind_C = (frame.shape[1] // 2, 80)
-                draw_plus_indicator(frame, ind_C, size=55,
-                                    dots=[(vx_l, vy_l, COL_L), (vx_r, vy_r, COL_R)],
-                                    trails=[trail_l, trail_r])
-                put_text(frame, "+X: right  |  +Y: down", (ind_C[0] - 110, ind_C[1] - 65), 0.7, COL_HINT2, 2)
-
-            # blink banner
-            if blink_event:
-                put_text(frame, f"BLINK {int(blink_ms)}ms", (18, 110), 0.9, (0, 140, 255), 2)
-
-            # FPS
-            fps_cnt += 1
-            t1 = time.time()
-            if t1 - fps_t0 >= 0.5:
-                fps = fps_cnt / (t1 - fps_t0)
-                fps_t0 = t1
-                fps_cnt = 0
-            put_text(frame, f"FPS: {fps:.1f}", (18, frame.shape[0] - 20), 0.8, (200, 200, 200), 2)
-
-            # logging
-            if writer:
-                writer.writerow([
-                    now_ms(),
-                    f"{ear_val:.4f}",
-                    eye_state,
-                    f"{nx:.4f}", f"{ny:.4f}",
-                    1 if blink_event else 0,
-                    int(blink_ms)
-                ])
-
-            cv2.imshow("eye-poc", frame)
-            if cv2.waitKey(1) & 0xFF == 27:  # ESC to quit
-                break
-
-    if f:
-        f.close()
+                cv2.line(indicator, (dot_l_x - 15, dot_l_y), (dot_l_x + 15, dot_l_y), (255, 255, 255), 1)
+                cv2.line(indicator, (dot_l_x, dot_l_y - 15), (dot_l_x, dot_l_y + 15), (255, 255, 255), 1)
+                cv2.line(indicator, (dot_r_x - 15, dot_r_y), (dot_r_x + 15, dot_r_y), (255, 255, 255), 1)
+                cv2.line(indicator, (dot_r_x, dot_r_y - 15), (dot_r_x, dot_r_y + 15), (255, 255, 255), 1)
+            
+            # 랜드마크 표시
+            if args.show_points:
+                for pt in left_pts + right_pts:
+                    cv2.circle(frame, pt, 2, (0, 255, 255), -1)
+            
+            # 정보 표시
+            info_y = 30
+            cv2.putText(frame, f"EAR: L={ear_left:.2f} R={ear_right:.2f}", 
+                       (10, info_y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            cv2.putText(frame, f"Gaze: L=({fx_l:.2f},{fy_l:.2f}) R=({fx_r:.2f},{fy_r:.2f})", 
+                       (10, info_y + 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            cv2.putText(frame, f"Blink: {blink_count}", 
+                       (10, info_y + 50), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+            
+            # 추적 품질 표시
+            quality_color = (0, 255, 0) if quality > 0.8 else (0, 255, 255) if quality > 0.5 else (0, 0, 255)
+            cv2.putText(frame, f"Quality: {quality:.0%}", 
+                       (10, info_y + 75), cv2.FONT_HERSHEY_SIMPLEX, 0.6, quality_color, 2)
+            
+            # 로그 저장
+            if log_data is not None:
+                log_data.append({
+                    'timestamp': time.time(),
+                    'ear_left': ear_left,
+                    'ear_right': ear_right,
+                    'gaze_left_x': fx_l,
+                    'gaze_left_y': fy_l,
+                    'gaze_right_x': fx_r,
+                    'gaze_right_y': fy_r,
+                    'quality': quality
+                })
+        else:
+            # 감지 실패
+            cv2.putText(frame, "Face not detected - Move closer or adjust lighting", 
+                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+            cv2.putText(indicator, "NO FACE DETECTED", 
+                       (actual_w // 2 - 150, indicator_h // 2), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+        
+        # 화면 결합
+        combined = np.vstack([indicator, frame])
+        cv2.imshow('Eye Tracking (Improved)', combined)
+        
+        # 종료
+        key = cv2.waitKey(1) & 0xFF
+        if key == 27:  # ESC
+            break
+    
+    # 정리
     cap.release()
     cv2.destroyAllWindows()
+    
+    if log_data:
+        save_log(log_data, 'eye_tracking')
+        print(f"\n로그 저장 완료: {len(log_data)}개 프레임")
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
