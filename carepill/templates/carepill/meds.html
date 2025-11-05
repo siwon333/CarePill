@@ -1,202 +1,405 @@
-{% extends "carepill/base.html" %}
 {% load static %}
-{% block title %}현재 있는 약 | CarePill{% endblock %}
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>현재 있는 약 - CarePill</title>
+  <link rel="stylesheet" href="{% static 'carepill/css/meds.css' %}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Alkatra:wght@400..700&family=Baloo+Bhaijaan+2:wght@400..800&family=Jua&family=Luckiest+Guy&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="meds-container">
+  <div class="meds-wrapper">
+    <!-- 배경 SVG (홈과 동일) -->
+    <svg class="meds-bg" viewBox="0 0 261 156" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="bgGradient" x1="158.58" y1="43.5349" x2="88.9886" y2="176.434" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="white" />
+          <stop offset="1" stop-color="#B8E6FF" />
+        </linearGradient>
 
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'carepill/css/meds.css' %}">
-<style>
-  .info-card {
-    background: white;
-    padding: 20px;
-    margin: 15px 0;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    position: relative;
-    transition: transform 0.2s;
-  }
-  .info-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  }
-  .info-card h3 {
-    margin-top: 0;
-    color: #2563eb;
-    font-size: 1.3em;
-  }
-  .company {
-    color: #6b7280;
-    font-size: 0.9em;
-    margin: 5px 0;
-  }
-  .dosage-badge {
-    background: #dbeafe;
-    color: #1e40af;
-    padding: 6px 12px;
-    border-radius: 6px;
-    margin: 10px 5px 10px 0;
-    font-weight: 500;
-    display: inline-block;
-    font-size: 0.9em;
-  }
-  .frequency-badge {
-    background: #fef3c7;
-    color: #92400e;
-    padding: 6px 12px;
-    border-radius: 6px;
-    margin: 10px 5px 10px 0;
-    font-weight: 500;
-    display: inline-block;
-    font-size: 0.9em;
-  }
-  .btn-delete {
-    position: absolute;
-    top: 15px;
-    right: 15px;
-    background: #ef4444;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    text-decoration: none;
-    font-size: 0.9em;
-  }
-  .btn-delete:hover {
-    background: #dc2626;
-  }
-  .btn-detail {
-    background: #2563eb;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 8px;
-    cursor: pointer;
-    text-decoration: none;
-    font-size: 0.9em;
-    display: inline-block;
-    margin-top: 15px;
-    font-weight: 500;
-    transition: background 0.2s;
-  }
-  .btn-detail:hover {
-    background: #1d4ed8;
-  }
-  .empty-state {
-    text-align: center;
-    padding: 60px 20px;
-    color: #6b7280;
-  }
-  .empty-state h3 {
-    font-size: 1.5em;
-    margin-bottom: 10px;
-  }
-  .primary-btn {
-    background: #2563eb;
-    color: white;
-    padding: 12px 24px;
-    border-radius: 8px;
-    text-decoration: none;
-    display: inline-block;
-    margin-top: 20px;
-    font-weight: 600;
-  }
-  .primary-btn:hover {
-    background: #1d4ed8;
-  }
-  .pill-image {
-    max-width: 80px;
-    max-height: 80px;
-    float: right;
-    margin-left: 15px;
-    border-radius: 8px;
-    border: 1px solid #e5e7eb;
-  }
-  .meta-info {
-    font-size: 0.85em;
-    color: #9ca3af;
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px solid #e5e7eb;
-  }
-</style>
-{% endblock %}
+        <linearGradient id="brandGradient1" x1="58" y1="0" x2="58" y2="109.744" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#FFCF41" />
+          <stop offset="0.480769" stop-color="#FFB01F" />
+        </linearGradient>
 
-{% block content %}
+        <linearGradient id="brandGradient4" x1="58" y1="0" x2="58" y2="109.744" gradientUnits="userSpaceOnUse">
+          <stop offset="0.0961538" stop-color="#FFCF41" />
+          <stop offset="0.966346" stop-color="#FF9500" />
+        </linearGradient>
 
-<section class="page-section">
-  <h1 class="page-title">현재 있는 약</h1>
-  <p class="page-desc">보관 중인 약 목록입니다.</p>
+        <filter id="innerShadow" x="0" y="0" width="116" height="113.903" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+          <feFlood flood-opacity="0" result="BackgroundImageFix" />
+          <feBlend in="SourceGraphic" in2="BackgroundImageFix" mode="normal" result="shape" />
+          <feColorMatrix in="SourceAlpha" result="hardAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" />
+          <feOffset dy="4" />
+          <feGaussianBlur stdDeviation="4.15" />
+          <feComposite in2="hardAlpha" k2="-1" k3="1" operator="arithmetic" />
+          <feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.5 0" />
+          <feBlend in2="shape" mode="normal" result="effect1_innerShadow" />
+        </filter>
 
-  <div class="card-grid">
-    {% if medications %}
-      {% for medication in medications %}
-        <div class="info-card">
-          <a href="/meds/delete/{{ medication.id }}/" 
-              class="btn-delete"
-             onclick="return confirm('{{ medication.medicine.item_name }}을(를) 정말 삭제하시겠습니까?')">
-          </a>
-          
-          {% if medication.medicine.pill_info.image_url %}
-            <img src="{{ medication.medicine.pill_info.image_url }}" 
-                 alt="{{ medication.medicine.item_name }}" 
-                 class="pill-image"
-                 onerror="this.style.display='none'">
-          {% endif %}
-          
-          <h3>{{ medication.medicine.item_name }}</h3>
-          <p class="company">{{ medication.medicine.entp_name }}</p>
-          
-          <div>
-            {% if medication.dosage %}
-              <span class="dosage-badge">💊 {{ medication.dosage }}</span>
-            {% endif %}
-            
-            {% if medication.frequency %}
-              <span class="frequency-badge">🕐 {{ medication.frequency }}</span>
-            {% endif %}
-          </div>
-          
-          <!-- 추가 메타 정보 -->
-          <div class="meta-info">
-            {% if medication.pharmacy_name %}
-              🏥 {{ medication.pharmacy_name }}
-            {% endif %}
-            {% if medication.hospital_name %}
-              • 🏨 {{ medication.hospital_name }}
-            {% endif %}
-            {% if medication.prescription_date %}
-              • 📅 조제일: {{ medication.prescription_date }}
-            {% endif %}
-            <br>
-            등록일: {{ medication.start_date|date:"Y년 m월 d일" }}
-          </div>
-          
-          <!-- 상세 정보 보기 버튼 -->
-          <a href="/meds/detail/{{ medication.id }}/" class="btn-detail">
-            📋 상세 정보 보기
-          </a>
-        </div>
-      {% endfor %}
-    {% else %}
-      <div class="empty-state">
-        <h3>📭 아직 등록된 약이 없습니다</h3>
-        <p style="color:#9ca3af; margin: 15px 0;">
-          처방전을 스캔하여 약을 추가해보세요!
-        </p>
-        <a href="/scan/" class="primary-btn">
-          📸 약 스캔하러 가기
-        </a>
-      </div>
-    {% endif %}
-  </div>
-  
-  {% if medications %}
-    <div style="margin-top: 30px; text-align: center;">
-      <a href="/scan/" class="primary-btn">
-        ➕ 약 더 추가하기
+        <clipPath id="pill1-right">
+          <rect x="146" y="5.44" width="18" height="7.26" />
+        </clipPath>
+        <clipPath id="pill2-right">
+          <rect x="189" y="5.44" width="18" height="7.26" />
+        </clipPath>
+        <clipPath id="pill3-right">
+          <rect x="233" y="5.44" width="18" height="7.26" />
+        </clipPath>
+      </defs>
+
+      <path d="M0 10C0 4.47716 4.47715 0 10 0H251C256.523 0 261 4.47715 261 10V146C261 151.523 256.523 156 251 156H10C4.47715 156 0 151.523 0 146V10Z" fill="url(#bgGradient)" />
+
+      <a href="/scan/">
+        <rect x="128" y="5.44" width="36" height="7.26" rx="3.63" fill="#FFD39E" />
+        <rect x="128" y="5.44" width="36" height="7.26" rx="3.63" fill="#FFBD67" clip-path="url(#pill1-right)" />
+        <line x1="146" y1="5.44" x2="146" y2="12.7" stroke="#FFE8C8" stroke-width="0.8" />
       </a>
-    </div>
-  {% endif %}
-</section>
 
-{% endblock %}
+      <a href="/voice_setup/">
+        <rect x="171" y="5.44" width="36" height="7.26" rx="3.63" fill="#A5C9FF" />
+        <rect x="171" y="5.44" width="36" height="7.26" rx="3.63" fill="#8FB8FF" clip-path="url(#pill2-right)" />
+        <line x1="189" y1="5.44" x2="189" y2="12.7" stroke="#C8DEFF" stroke-width="0.8" />
+      </a>
+
+      <a href="/home/">
+        <rect x="215" y="5.44" width="36" height="7.26" rx="3.63" fill="#F3B8FF" />
+        <rect x="215" y="5.44" width="36" height="7.26" rx="3.63" fill="#EDA3FF" clip-path="url(#pill3-right)" />
+        <line x1="233" y1="5.44" x2="233" y2="12.7" stroke="#F8D6FF" stroke-width="0.8" />
+      </a>
+    </svg>
+
+    <a href="/" class="brand-blob-container">
+      <svg viewBox="0 0 116 110" fill="none" class="brand-blob-svg">
+        <g filter="url(#innerShadow)">
+          <path d="M86.7207 52.7973C86.7207 66.1295 75.3633 76.9373 61.3531 76.9373C47.343 76.9373 35.9855 66.1295 35.9855 52.7973C35.9855 39.4652 47.343 28.6574 61.3531 28.6574C75.3633 28.6574 86.7207 39.4652 86.7207 52.7973Z" fill="url(#brandGradient1)" />
+          <path d="M13.4365 21.968C13.4365 16.4452 17.9136 11.968 23.4365 11.968H51.6663C57.1891 11.968 61.6663 16.4452 61.6663 21.968V66.9373C61.6663 72.4601 57.1891 76.9373 51.6663 76.9373H23.4365C17.9136 76.9373 13.4365 72.4602 13.4365 66.9373V21.968Z" fill="url(#brandGradient1)" />
+          <path d="M87.6049 11.968C91.2366 11.968 94.7398 13.8991 95.7443 17.3891C96.3949 19.6492 96.7425 22.0284 96.7425 24.485C96.7425 39.2985 84.1231 51.3072 68.5563 51.3072C52.9894 51.3072 40.37 39.2985 40.37 24.485C40.37 22.0284 40.7177 19.6492 41.3682 17.3891C42.3728 13.8991 45.8759 11.968 49.5076 11.968H87.6049Z" fill="url(#brandGradient1)" />
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M104.604 0C105.625 0 106.636 0.299612 107.407 0.96923C108.55 1.9624 109.311 2.91225 109.669 3.37936C110.456 4.406 111.026 5.39079 111.38 6.04412C112.152 7.46625 112.85 9.08508 113.445 10.7625C114.644 14.146 115.756 18.7027 115.966 23.9135C116.276 31.627 114.545 41.0153 108.223 49.5805C106.636 51.73 105.717 54.3138 105.603 56.9829C105.41 61.5308 104.464 66.4227 102.327 71.2463C97.281 82.6366 86.5254 91.4988 69.7935 94.5304L12.1298 107.1C5.89532 108.459 0 103.71 0 97.3295V10C0 4.47715 4.47715 0 10 0H104.604ZM29.1123 60.2928C29.1123 66.6736 35.0075 71.4223 41.242 70.0634L63.0735 65.3049L63.4077 65.2314L63.7453 65.173C67.7753 64.4699 69.9704 63.3089 71.1424 62.4448C72.2859 61.6017 72.9786 60.659 73.45 59.5947C74.5716 57.0628 74.4532 53.6443 73.7982 51.4685L72.8823 48.4262C71.6548 44.3486 73.1441 39.941 76.5934 37.4437L79.3897 35.419C83.877 32.1701 79.8354 26.9281 74.2955 26.9281H39.1123C33.5895 26.9281 29.1123 31.4052 29.1123 36.9281V60.2928Z" fill="url(#brandGradient4)" />
+          <path d="M16.9619 106.059L0 109.903V98.8476L14.0938 95.6533L16.9619 106.059Z" fill="#FF9E02" />
+        </g>
+      </svg>
+
+      <p class="brand-subtitle">당신의 복약을 더 쉽고、안전하게</p>
+      <h1 class="brand-title">CARE<br>PILL</h1>
+    </a>
+
+    <div class="meds-content-container">
+      <div class="meds-content-frame">
+        <h2 class="meds-content-title">현재 있는 약</h2>
+        <p class="meds-content-desc">보관 중인 약 목록입니다</p>
+        
+        <div class="card-grid">
+
+
+    <div class="info-card" role="group" aria-label="처방약_1">
+    <img class="med-thumb" src="{% static 'carepill/img/prescription.png' %}" alt="처방약_1">
+    <div class="med-body">
+      <h3>첫번째 처방약</h3>
+      <p class="med-type">탐라우리들의원, 킴스약국</p>
+      <ul class="med-facts">
+        <li>기침가래약</li>
+        <li>종류: 코대원포르테시럽, 에스부펜정, 펜세타정, 메리온정, 원스에어정</li>
+        <li>1일 3회 3일분</li>
+      </ul>
+      <button class="read-btn"
+        onclick="readMedicine('첫번째 처방약','킴스약국에서 2025년 9월 30일에 조제받은 약입니다')"> 
+        🔊 약 정보 듣기
+      </button>
+    </div>
+  </div>
+
+  <!-- 노즈그린 -->
+  <div class="info-card" role="group" aria-label="처방약_2">
+    <img class="med-thumb" src="{% static 'carepill/img/prescription.png' %}" alt="처방약_2">
+    <div class="med-body">
+      <h3>두번째 처방약</h3>
+      <p class="med-type">블리비의원 제주점, 초록약국</p>
+      <ul class="med-facts">
+        <li>염증완화약</li>
+        <li>디솔린정, 미노클캡슐</li>
+        <li>1일 2회 3일분</li>
+      </ul>
+      <button class="read-btn"
+        onclick="readMedicine('두번째 처방약','초록약국에서 2025년 10월 24일에 조제받은 약입니다')">
+        🔊 약 정보 듣기
+      </button>
+    </div>
+  </div>
+
+            <!-- 확펜 연질캡슐 -->
+  <div class="info-card" role="group" aria-label="확펜 연질캡슐">
+    <img class="med-thumb" src="{% static 'carepill/img/hwakpen_softcapsule.jpg' %}" alt="확펜 연질캡슐 제품 이미지">
+    <div class="med-body">
+      <h3>확펜 연질캡슐</h3>
+      <p class="med-type">소염·진통제 (나프록센)</p>
+      <ul class="med-facts">
+        <li>적응증: 편두통, 치통, 생리통, 관절염</li>
+        <li>기타: 관절염/급성통풍/골격근장애·발치/편두통 등 증상에 따라 용법 다름</li>
+        <li>회사: 유한양행</li>
+      </ul>
+      <button class="read-btn"
+        onclick="readMedicine('확펜 연질캡슐', '나프록센 성분의 소염 진통제입니다. 편두통, 치통, 생리통, 관절염 등에 쓰이며, 증상에 따라 용법이 다릅니다. 제조사는 유한양행입니다.')">
+        🔊 약 정보 듣기
+      </button>
+    </div>
+  </div>
+
+  <!-- 노즈그린 -->
+  <div class="info-card" role="group" aria-label="노즈그린">
+    <img class="med-thumb" src="{% static 'carepill/img/nosegreen_softcapsule.jpg' %}" alt="노즈그린 제품 이미지">
+    <div class="med-body">
+      <h3>노즈그린</h3>
+      <p class="med-type">코감기·비염 증상 완화</p>
+      <ul class="med-facts">
+        <li>증상: 코막힘, 콧물, 재채기, 눈물, 인후통, 머리 무거움</li>
+        <li>용법: 만 15세 이상 1회 1캡슐, 1일 3회 식후</li>
+        <li>회사: GC녹십자</li>
+      </ul>
+      <button class="read-btn"
+        onclick="readMedicine('노즈그린', '코막힘, 콧물, 재채기, 눈물, 인후통, 머리 무거움 완화에 사용합니다. 만 15세 이상은 1회 1캡슐, 하루 3회 식후에 복용합니다. 제조사는 GC녹십자입니다.')">
+        🔊 약 정보 듣기
+      </button>
+    </div>
+  </div>
+
+  <!-- 모드코프S목감기 -->
+  <div class="info-card" role="group" aria-label="모드코프 S 목감기">
+    <img class="med-thumb" src="{% static 'carepill/img/modcough_s.jpg' %}" alt="모드코프 S 목감기 제품 이미지">
+    <div class="med-body">
+      <h3>모드코프S목감기</h3>
+      <p class="med-type">기침·가래·인후통</p>
+      <ul class="med-facts">
+        <li>용법: 1일 3회, 식후 30분</li>
+        <li>만 15세 이상: 1회 2캡슐</li>
+        <li>만 11~15세 미만: 1회 1과 1/3캡슐</li>
+        <li>만 7세 초과~11세 미만: 1회 1캡슐</li>
+        <li>회사: 종근당</li>
+      </ul>
+      <button class="read-btn"
+        onclick="readMedicine('모드코프 에스 목감기', '기침, 가래, 인후통 완화용입니다. 하루 3회 식후 30분에 복용합니다. 연령별 용량이 다르니 표기를 확인하세요. 제조사는 종근당입니다.')">
+        🔊 약 정보 듣기
+      </button>
+    </div>
+  </div>
+
+  <!-- 파제오 0.7% 점안액 -->
+  <div class="info-card" role="group" aria-label="파제오 0.7 퍼센트 점안액">
+    <img class="med-thumb" src="{% static 'carepill/img/pazeo_0_7.jpg' %}" alt="파제오 0.7% 점안액 제품 이미지">
+    <div class="med-body">
+      <h3>파제오 0.7% 점안액</h3>
+      <p class="med-type">알레르기성 결막염</p>
+      <ul class="med-facts">
+        <li>증상: 안구 가려움증 치료</li>
+        <li>용법: 1회 1방울, 1일 1회</li>
+        <li>회사: Novartis</li>
+      </ul>
+      <button class="read-btn"
+        onclick="readMedicine('파제오 영점칠 퍼센트 점안액', '알레르기성 결막염의 눈 가려움증에 사용합니다. 하루 한 번, 한 방울 점안합니다. 제조사는 노바티스입니다.')">
+        🔊 약 정보 듣기
+      </button>
+    </div>
+  </div>
+
+  <!-- 말릭스정 -->
+  <div class="info-card" role="group" aria-label="말릭스정">
+    <img class="med-thumb" src="{% static 'carepill/img/malix_tablet.jpg' %}" alt="말릭스정 제품 이미지">
+    <div class="med-body">
+      <h3>말릭스정</h3>
+      <p class="med-type">장·위장관 운동조절제</p>
+      <ul class="med-facts">
+        <li>적응증: 과민성 대장 증후군, 기능성 소화불량</li>
+        <li>용법: 1일 3회 식전, 연령·증상에 따라 증감</li>
+      </ul>
+      <button class="read-btn"
+        onclick="readMedicine('말릭스정', '과민성 대장 증후군과 기능성 소화불량에 사용합니다. 하루 세 번 식전에 복용하며, 연령과 증상에 따라 용량을 조절합니다.')">
+        🔊 약 정보 듣기
+      </button>
+    </div>
+  </div>
+
+</div>
+<!-- 
+          <div class="info-card">
+            <h3>타이레놀 500</h3>
+            <p class="med-type">해열·진통제</p>
+            <p class="med-dosage">1회 1정, 1일 3회</p>
+            <button class="read-btn" onclick="readMedicine('타이레놀 500', '해열 진통제입니다. 1회 1정, 1일 3회 복용하세요.')">
+              🔊 약 정보 듣기
+            </button>
+          </div>
+          
+          <div class="info-card">
+            <h3>가스터 10mg</h3>
+            <p class="med-type">소화기계 약</p>
+            <p class="med-dosage">식후 30분</p>
+            <button class="read-btn" onclick="readMedicine('가스터 10mg', '소화기계 약입니다. 식후 30분에 복용하세요.')">
+              🔊 약 정보 듣기
+            </button>
+          </div>
+
+          <div class="info-card">
+            <h3>후시딘</h3>
+            <p class="med-type">항생제 연고</p>
+            <p class="med-dosage">1일 2-3회 도포</p>
+            <button class="read-btn" onclick="readMedicine('후시딘', '항생제 연고입니다. 1일 2에서 3회 상처 부위에 도포하세요.')">
+              🔊 약 정보 듣기
+            </button>
+          </div>
+
+          <div class="info-card">
+            <h3>베아제 정</h3>
+            <p class="med-type">소화효소제</p>
+            <p class="med-dosage">식후 즉시 복용</p>
+            <button class="read-btn" onclick="readMedicine('베아제 정', '소화효소제입니다. 식후 즉시 복용하세요.')">
+              🔊 약 정보 듣기
+            </button>
+          </div>
+
+          <div class="info-card">
+            <h3>덱시부프로펜</h3>
+            <p class="med-type">소염진통제</p>
+            <p class="med-dosage">1회 1정, 1일 2회</p>
+            <button class="read-btn" onclick="readMedicine('덱시부프로펜', '소염진통제입니다. 1회 1정, 1일 2회 복용하세요.')">
+              🔊 약 정보 듣기
+            </button>
+          </div>
+
+          <div class="info-card">
+            <h3>비타민 C</h3>
+            <p class="med-type">영양제</p>
+            <p class="med-dosage">1일 1회 복용</p>
+            <button class="read-btn" onclick="readMedicine('비타민 씨', '비타민 씨 영양제입니다. 1일 1회 복용하세요.')">
+              🔊 약 정보 듣기
+            </button>
+          </div>
+        </div> -->
+      </div>
+    </div>
+
+    <div class="mini-tabs">
+      <span class="mini-tab-text">약 봉투 스캔</span>
+      <span class="mini-tab-text">음성 등록</span>
+      <span class="mini-tab-text" id="settingsTab" style="cursor: pointer;">설정</span>
+    </div>
+
+    <!-- Voice Recognition Status Overlay -->
+    <div id="voiceStatusOverlay" class="voice-status-overlay" style="display: none;">
+      <div class="voice-status-card">
+        <button class="voice-close-btn" onclick="stopVoiceRecognition()">✕</button>
+        <div class="voice-status-icon" id="voiceStatusIcon">
+          <div class="voice-pulse"></div>
+          <span class="voice-mic-icon">🎤</span>
+        </div>
+        <h2 class="voice-status-title" id="voiceStatusTitle">음성 인식 중...</h2>
+        <p class="voice-status-message" id="voiceStatusMessage">명령어를 말씀해주세요</p>
+        <div class="voice-commands-help">
+          <p><strong>사용 가능한 명령어:</strong></p>
+          <ul>
+            <li>"약투입" - 약 투입 화면</li>
+            <li>"현재있는 약" - 약 목록 화면</li>
+            <li>"말하기" - 음성 대화 화면</li>
+            <li>"약분출" - 약 분출 화면</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="{% static 'carepill/js/tts_helper.js' %}"></script>
+<script src="{% static 'carepill/js/voice_navigation.js' %}"></script>
+<script>
+  function readMedicine(name, info) {
+    if (window.CarePillTTS) {
+      const message = `${name}. ${info}`;
+      window.CarePillTTS.speak(message);
+    } else {
+      alert('음성 기능을 사용할 수 없습니다.');
+    }
+  }
+
+  // 음성 가이드 재생 함수
+  function playVoiceGuide(audioFile) {
+    const audio = new Audio("/static/carepill/audio/" + audioFile);
+    audio.play().catch(err => console.error('Audio play error:', err));
+  }
+
+  // Voice Navigation Logic
+  document.addEventListener('DOMContentLoaded', function() {
+    // 페이지 로드 시 음성 가이드 재생
+    setTimeout(() => {
+      playVoiceGuide('보관중인 약 목록입니다.mp3');
+    }, 500);
+
+    // 설정 탭 클릭 이벤트 (토글)
+    const settingsTab = document.getElementById('settingsTab');
+    if (settingsTab) {
+      settingsTab.addEventListener('click', function() {
+        toggleVoiceRecognition();
+      });
+    }
+
+    // 페이지 로드 시 자동 시작
+    if (window.voiceNavigator) {
+      window.voiceNavigator.autoStart(
+        function(status, message) {
+          console.log(`상태: ${status}, 메시지: ${message}`);
+        },
+        function(command, url) {
+          console.log(`명령어 인식: ${command} → ${url}`);
+        }
+      );
+    }
+
+    // 음성 인식 토글 함수 (UI 변화 없음)
+    window.toggleVoiceRecognition = function() {
+      if (!window.voiceNavigator) {
+        console.error('음성 인식을 사용할 수 없습니다.');
+        return;
+      }
+
+      const isEnabled = window.voiceNavigator.toggle(
+        function(status, message) {
+          console.log(`상태: ${status}, 메시지: ${message}`);
+        },
+        function(command, url) {
+          console.log(`명령어 인식: ${command} → ${url}`);
+        }
+      );
+
+      console.log(isEnabled ? '음성 인식 활성화됨' : '음성 인식 비활성화됨');
+    };
+  });
+</script>
+<style>
+  .voice-status-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; z-index: 10000; backdrop-filter: blur(5px); }
+  .voice-status-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 24px; padding: 40px 30px; max-width: 400px; width: 90%; text-align: center; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); position: relative; animation: slideUp 0.3s ease-out; }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(50px); } to { opacity: 1; transform: translateY(0); } }
+  .voice-close-btn { position: absolute; top: 15px; right: 15px; background: rgba(255, 255, 255, 0.2); border: none; color: white; font-size: 24px; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; transition: all 0.3s; }
+  .voice-close-btn:hover { background: rgba(255, 255, 255, 0.3); transform: rotate(90deg); }
+  .voice-status-icon { position: relative; width: 100px; height: 100px; margin: 0 auto 20px; display: flex; justify-content: center; align-items: center; }
+  .voice-pulse { position: absolute; width: 100%; height: 100%; border-radius: 50%; background: rgba(255, 255, 255, 0.3); opacity: 0; }
+  .voice-status-icon.listening .voice-pulse { animation: pulse 1.5s ease-out infinite; }
+  @keyframes pulse { 0% { transform: scale(0.8); opacity: 0.8; } 100% { transform: scale(1.5); opacity: 0; } }
+  .voice-mic-icon { font-size: 50px; z-index: 1; }
+  .voice-status-icon.recognized .voice-mic-icon { animation: bounce 0.5s ease; }
+  @keyframes bounce { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.2); } }
+  .voice-status-title { color: white; font-size: 24px; font-weight: bold; margin: 15px 0 10px; }
+  .voice-status-message { color: rgba(255, 255, 255, 0.9); font-size: 16px; margin-bottom: 25px; min-height: 48px; white-space: pre-line; }
+  .voice-commands-help { background: rgba(255, 255, 255, 0.15); border-radius: 12px; padding: 20px; text-align: left; }
+  .voice-commands-help p { color: white; margin: 0 0 10px 0; font-size: 14px; }
+  .voice-commands-help ul { list-style: none; padding: 0; margin: 0; }
+  .voice-commands-help li { color: rgba(255, 255, 255, 0.9); font-size: 14px; padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+  .voice-commands-help li:last-child { border-bottom: none; }
+  #settingsTab:hover { opacity: 0.7; text-decoration: underline; }
+</style>
+
+</body>
+</html>

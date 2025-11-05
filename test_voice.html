@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voice Navigation Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      font-size: 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin: 10px 0;
+      width: 100%;
+    }
+    button:hover {
+      opacity: 0.9;
+    }
+    .status {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f0f0f0;
+      border-radius: 8px;
+      min-height: 50px;
+    }
+    .log {
+      margin-top: 10px;
+      padding: 10px;
+      background: #e8e8e8;
+      border-radius: 5px;
+      font-size: 14px;
+      font-family: monospace;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎤 음성 명령 테스트</h1>
+
+    <button onclick="testSupport()">1. 브라우저 지원 확인</button>
+    <button onclick="startTest()">2. 음성 인식 시작</button>
+    <button onclick="stopTest()">3. 음성 인식 중지</button>
+
+    <div class="status" id="status">준비됨</div>
+    <div class="log" id="log"></div>
+  </div>
+
+  <script>
+    let recognition = null;
+    let logs = [];
+
+    function addLog(message) {
+      const timestamp = new Date().toLocaleTimeString();
+      logs.push(`[${timestamp}] ${message}`);
+      document.getElementById('log').innerHTML = logs.slice(-10).join('<br>');
+      console.log(message);
+    }
+
+    function updateStatus(message) {
+      document.getElementById('status').textContent = message;
+      addLog(message);
+    }
+
+    function testSupport() {
+      if ('webkitSpeechRecognition' in window) {
+        updateStatus('✅ Web Speech API 지원됨 (webkit)');
+      } else if ('SpeechRecognition' in window) {
+        updateStatus('✅ Web Speech API 지원됨 (standard)');
+      } else {
+        updateStatus('❌ Web Speech API 미지원 - Chrome 브라우저를 사용하세요');
+      }
+    }
+
+    function startTest() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+      if (!SpeechRecognition) {
+        updateStatus('❌ 음성 인식을 사용할 수 없습니다');
+        return;
+      }
+
+      recognition = new SpeechRecognition();
+      recognition.lang = 'ko-KR';
+      recognition.continuous = true;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        updateStatus('🎤 음성 인식 시작됨 - 말씀해주세요!');
+      };
+
+      recognition.onresult = (event) => {
+        const last = event.results.length - 1;
+        const transcript = event.results[last][0].transcript;
+        updateStatus(`📝 인식된 음성: "${transcript}"`);
+
+        // 명령어 체크
+        if (transcript.includes('약투입') || transcript.includes('투입')) {
+          updateStatus('✅ "약투입" 명령 인식 → /scan_choice/ 이동');
+        } else if (transcript.includes('현재') || transcript.includes('목록')) {
+          updateStatus('✅ "현재있는 약" 명령 인식 → /meds/ 이동');
+        } else if (transcript.includes('말하기') || transcript.includes('음성')) {
+          updateStatus('✅ "말하기" 명령 인식 → /voice/ 이동');
+        } else if (transcript.includes('분출')) {
+          updateStatus('✅ "약분출" 명령 인식 → /how2green/ 이동');
+        } else {
+          updateStatus(`⚠️ 알 수 없는 명령: "${transcript}"`);
+        }
+      };
+
+      recognition.onerror = (event) => {
+        let errorMsg = '';
+        switch (event.error) {
+          case 'no-speech':
+            errorMsg = '음성이 감지되지 않았습니다';
+            break;
+          case 'audio-capture':
+            errorMsg = '마이크를 찾을 수 없습니다';
+            break;
+          case 'not-allowed':
+            errorMsg = '마이크 권한이 거부되었습니다';
+            break;
+          case 'network':
+            errorMsg = '네트워크 오류';
+            break;
+          default:
+            errorMsg = `오류: ${event.error}`;
+        }
+        updateStatus(`❌ ${errorMsg}`);
+      };
+
+      recognition.onend = () => {
+        updateStatus('🛑 음성 인식 종료됨');
+      };
+
+      try {
+        recognition.start();
+      } catch (error) {
+        updateStatus(`❌ 시작 실패: ${error.message}`);
+      }
+    }
+
+    function stopTest() {
+      if (recognition) {
+        recognition.stop();
+        updateStatus('🛑 음성 인식 중지 요청');
+      } else {
+        updateStatus('⚠️ 실행 중인 음성 인식이 없습니다');
+      }
+    }
+
+    // 페이지 로드 시 자동 지원 확인
+    window.addEventListener('load', testSupport);
+  </script>
+</body>
+</html>

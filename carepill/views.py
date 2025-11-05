@@ -1,49 +1,19 @@
-import os
-import re
-import json
-import time
-import uuid
-import traceback
-import datetime
-import logging
-import requests
-from collections import Counter
-from typing import List, Dict, Tuple
-
-# ===== Django import =====
-from django.conf import settings
-from django.http import JsonResponse, HttpResponse, Http404
-from django.shortcuts import render, redirect, get_object_or_404  # ⭐ redirect 추가
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
-from django.contrib.auth.models import User  # ⭐ User 추가
-from django.db.models import Q
-import local_settings
-
-# ===== medicines 앱 연동 (내 약 목록용) =====
-from medicines.models import Medicine, UserMedication  # ⭐ 추가
-
-api_key = local_settings.OPENAI_API_KEY
-
-def meds(request):
-    # TODO: 실제 배포 시 request.user 사용
-    user = User.objects.first()
-    if not user:
-        user = User.objects.create_user(username='guest', password='guest123')
-    
-    # medicines 앱의 UserMedication에서 데이터 가져오기
-    medications = UserMedication.objects.filter(
-        user=user,
-        is_completed=False
-    ).select_related('medicine', 'medicine__pill_info')
-    
-    return render(request, "carepill/meds.html", {
-        'medications': medications
-    })
+import os, requests
+from django.http import JsonResponse
+from django.shortcuts import render
 
 def home(request):  return render(request, "carepill/home.html")
 def scan(request):  return render(request, "carepill/scan.html")
+def meds(request):  return render(request, "carepill/meds.html")
 def voice(request): return render(request, "carepill/voice.html")
+def scan_choice(request): return render(request, "carepill/scan_choice.html")
+def how2prescription(request): return render(request, "carepill/how2prescription.html")
+def how2otc(request): return render(request, "carepill/how2otc.html")
+def meds_hos(request): return render(request, "carepill/meds_hos.html")
+def meds_hos2(request): return render(request, "carepill/meds_hos2.html")
+def how2green(request): return render(request, "carepill/how2green.html")
+def how2green_result(request): return render(request, "carepill/how2green_result.html")
+def stt_test(request): return render(request, "carepill/stt_test.html")
 
 def issue_ephemeral(request):
     r = requests.post(
@@ -55,11 +25,11 @@ def issue_ephemeral(request):
         },
         json={
             "model": "gpt-4o-mini-realtime-preview-2024-12-17",
-            "voice": "verse",
-            "modalities": ["audio", "text"],
+            "voice": "verse",  # 사용 안 함 (ElevenLabs 사용)
+            "modalities": ["text"],  # 텍스트만 받음 (오디오는 ElevenLabs로)
             "turn_detection": {
-                "type": "server_vad", 
-                "create_response": True, 
+                "type": "server_vad",
+                "create_response": True,
                 "silence_duration_ms": 500
             },
             "input_audio_transcription": {"model": "gpt-4o-mini-transcribe"},
@@ -67,8 +37,10 @@ def issue_ephemeral(request):
                 "You are 'CarePill', a voice-based medication assistant designed to help visually impaired users. "
                 "Speak Korean with clear, precise pronunciation, like a professional news announcer. "
                 "Provide guidance about medication usage, dosage, timing, and potential drug interactions. "
-                "Offer emotional support and speak warmly, as if you are a trusted friend who cares about the user’s well-being. "
-                "Keep your responses short, calm, and friendly, delivering them with confidence and kindness."
+                "Offer emotional support and speak warmly, as if you are a trusted friend who cares about the user's well-being. "
+                "Keep your responses short, calm, and friendly, delivering them with confidence and kindness. "
+                "IMPORTANT: Your responses will be converted to speech using a custom voice clone, so write naturally as if speaking."
+                "만약에 사용자가 '하루에 타이레놀 몇알씩 먹어야돼?' 또는 이와 같은 질문을 하면 무조건 '성인기준 4시간~6시간 간격으로 1회 2정, 하루 최대 8정까지 복용 가능합니다. 자세한 내용은 약사나 의사와 상담하세요.' 라고 대답해야 합니다. "
             ),
         },
         timeout=20,
@@ -350,6 +322,7 @@ def api_conversation_summarize_and_save(request):
         if debug_mode: resp["debug"] = debug
         return JsonResponse(resp, status=200)
 
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         return JsonResponse({"error": "missing_api_key"}, status=500)
 
@@ -450,59 +423,81 @@ logger = logging.getLogger(__name__)
 # 약봉투 스캔 API (Multi‑cam 지원)
 # -----------------------------
 
-from django.views.decorators.csrf import csrf_exempt
-from django.http import JsonResponse
-from django.contrib.auth.models import User
-from django.db.models import Q
-from medicines.models import Medicine, UserMedication
-import json
-import re
-import requests
-from collections import Counter
-from typing import List, Dict, Tuple
-from datetime import datetime
-
 def _strip_code_fence(text: str) -> str:
-    """코드 펜스(```)를 제거하고 순수 JSON 반환"""
+    """```
+    ```json
+    { ... }
+    ```
+    처럼 감싸진 JSON 문자열에서 코드 펜스를 제거하고
+    순수한 내용만 반환한다.
+    """
     if not isinstance(text, str):
         return text
+
     t = text.strip()
     if t.startswith("```"):
+        # ```json, ```JSON 등의 코드 펜스 제거
         if t.startswith("```json") or t.startswith("```JSON"):
+            # 첫 줄(```json`)을 제거
             parts = t.split("\n", 1)
             t = parts[1] if len(parts) > 1 else ""
         else:
+            # 그냥 ``` 로 시작할 때
             t = t[3:]
+        # 끝의 ``` 제거
         if t.endswith("```"):
             t = t[:-3]
         t = t.strip()
     return t
 
 
-def _call_openai_envelope(image_b64: str, api_key: str, model: str = "gpt-4o") -> str:
-    """OpenAI Vision API로 약봉투 이미지 분석"""
+from collections import Counter
+from typing import List, Dict, Tuple
+import os
+import requests
+
+def _call_openai_envelope(image_b64: str, model: str = "gpt-4o") -> str:
+    """
+    한국 약봉투 이미지를 OCR/분석하여 구조화된 JSON 추출
+    model: gpt-4o (고정확도) 또는 gpt-4o-mini (저비용)
+    """
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY가 설정되지 않았습니다.")
 
     text_prompt = (
-        "다음 약봉투 이미지를 분석하여 아래 스키마의 정확한 JSON만 출력하세요.\n"
-        "가능하면 숫자/날짜는 포맷을 맞추세요.\n"
+        "당신은 한국 약봉투 OCR 전문가입니다. 아래 이미지에서 정확한 정보를 추출하세요.\n\n"
+        "**중요한 한국 약봉투 특징:**\n"
+        "- 환자명, 나이는 상단에 표시됨\n"
+        "- 조제일자는 'YYYY.MM.DD' 또는 'YYYY-MM-DD' 형식\n"
+        "- 약국명은 봉투 상단 또는 하단에 표시\n"
+        "- 처방전번호/조제번호는 숫자로 된 긴 코드\n"
+        "- 약품명은 여러 개일 수 있으며, 가장 주요한 약 하나를 선택\n"
+        "- 복용법: '1일 3회', '아침 저녁 식후 30분', '취침 전' 등\n"
+        "- 복용기간: '총 7일분', '30일분', '1회 복용' 등\n\n"
+        "**출력 형식 (반드시 유효한 JSON만, 코드펜스 없이):**\n"
         "{\n"
-        '  "patient_name": "환자명(문자열)",\n'
-        '  "age": "나이(숫자 또는 빈 문자열)",\n'
-        '  "dispense_date": "조제일자(YYYY-MM-DD 또는 YYYY.MM.DD)",\n'
-        '  "pharmacy_name": "약국명",\n'
-        '  "prescription_number": "처방전 또는 조제 번호",\n'
-        '  "medicine_name": "약품명",\n'
-        '  "dosage_instructions": "복용법(예: 아침, 저녁, 취침 전)",\n'
-        '  "frequency": "복용횟수/기간(예: 1일 1회 총 30일분)",\n'
+        '  "patient_name": "환자 이름",\n'
+        '  "age": "숫자만 (예: 45)",\n'
+        '  "dispense_date": "YYYY-MM-DD 형식",\n'
+        '  "pharmacy_name": "○○약국",\n'
+        '  "prescription_number": "처방/조제번호",\n'
+        '  "medicine_name": "주요 약품명 (여러 개면 대표 약 1개)",\n'
+        '  "dosage_instructions": "복용 시간과 방법",\n'
+        '  "frequency": "복용 횟수와 기간",\n'
         '  "med_features": {\n'
-        '    "description": "약의 한줄 설명",\n'
-        '    "indications": "어디에 좋은지(적응증)",\n'
-        '    "cautions": "주의사항(상호작용/부작용/주의대상 간단 요약)"\n'
+        '    "description": "약의 용도 한 줄 설명 (예: 해열진통제, 소화제)",\n'
+        '    "indications": "적응증 (두통, 발열, 소화불량 등)",\n'
+        '    "cautions": "주의사항 (공복 섭취 금지, 졸음 유발 등)"\n'
         "  }\n"
-        "}\n"
-        "주의: 오타를 피하고, 사진 속 정보만 사용하세요. 모를 경우 빈 문자열로 두세요. 설명 문장이나 코드펜스 없이 JSON만 출력합니다."
+        "}\n\n"
+        "**규칙:**\n"
+        "1. 이미지에서 명확히 보이는 정보만 입력\n"
+        "2. 불명확하거나 없는 정보는 빈 문자열 \"\" 사용\n"
+        "3. 날짜는 반드시 YYYY-MM-DD 형식으로 변환\n"
+        "4. 나이는 숫자만 추출\n"
+        "5. 설명 문구 없이 JSON만 출력\n"
+        "6. 코드펜스(```)는 사용하지 말 것"
     )
 
     payload = {
@@ -510,7 +505,12 @@ def _call_openai_envelope(image_b64: str, api_key: str, model: str = "gpt-4o") -
         "messages": [
             {
                 "role": "system",
-                "content": "너는 한국 약봉투 OCR/정보추출 전문가다. 반드시 유효한 JSON만 출력한다. 사진에 없는 정보는 공란('')으로 남긴다."
+                "content": (
+                    "당신은 한국 약국 처방전과 약봉투를 정확하게 읽는 OCR 전문가입니다. "
+                    "한글 약품명, 한국식 날짜 형식, 한국 약국 시스템을 완벽하게 이해합니다. "
+                    "반드시 유효한 JSON만 출력하며, 불명확한 정보는 빈 문자열로 처리합니다. "
+                    "이미지 품질이 낮거나 흐릿해도 최선을 다해 정보를 추출합니다."
+                )
             },
             {
                 "role": "user",
@@ -521,8 +521,8 @@ def _call_openai_envelope(image_b64: str, api_key: str, model: str = "gpt-4o") -
                 ]
             }
         ],
-        "max_tokens": 1000,
-        "temperature": 0.1
+        "max_tokens": 1500,
+        "temperature": 0.0
     }
 
     r = requests.post(
@@ -530,326 +530,328 @@ def _call_openai_envelope(image_b64: str, api_key: str, model: str = "gpt-4o") -
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
         json=payload,
         timeout=60
-    )
+        )
     if r.status_code != 200:
         raise RuntimeError(f"OpenAI 오류 {r.status_code}: {r.text[:200]}")
     data = r.json()
     return data["choices"][0]["message"]["content"]
 
 
-def _majority_merge(values: List[str]) -> Tuple[str, float]:
-    """다수결로 가장 많이 나온 값 선택"""
-    cleaned = [(v or "").strip() for v in values if isinstance(v, str)]
-    non_empty = [v for v in cleaned if v]
-    if not non_empty:
-        return "", 0.0
-    cnt = Counter(non_empty)
-    top = cnt.most_common()
-    top_freq = top[0][1]
-    candidates = [v for v, c in top if c == top_freq]
-    winner = max(candidates, key=lambda s: len(s))
-    conf = cnt[winner] / max(1, len(values))
-    return winner, round(conf, 3)
 
+
+
+def _majority_merge(values: List[str]) -> Tuple[str, float]:
+    cleaned = [ (v or "").strip() for v in values if isinstance(v, str) ]
+    non_empty = [v for v in cleaned if v]
+    if not non_empty: return "", 0.0
+    cnt = Counter(non_empty)
+    top = cnt.most_common(); top_freq = top[0][1]
+    candidates = [v for v,c in top if c==top_freq]
+    winner = max(candidates, key=lambda s: len(s))
+    conf = cnt[winner] / max(1,len(values))
+    return winner, round(conf,3)
+
+def _digits_only(s: str) -> str: return "".join(ch for ch in (s or "") if ch.isdigit())
 
 def _merge_envelope_json(json_list: List[Dict]) -> Tuple[Dict, Dict]:
-    """여러 샷의 결과를 병합"""
-    merged = {}
-    diag = {}
-    
-    # 기본 정보 병합
-    for field in ["patient_name", "age", "dispense_date", "pharmacy_name", "hospital_name", "prescription_number"]:
-        vals = [str(r.get(field, "") or "").strip() for r in json_list]
-        best, conf = _majority_merge(vals)
-        merged[field] = best
-        diag[field] = {"per_shot": vals, "selected": best, "confidence": conf}
-    
-    # ⭐ medicines 배열 병합 (모든 약을 수집)
-    all_medicines = []
-    medicine_names_seen = set()
-    
-    for result in json_list:
-        medicines = result.get("medicines", [])
-        if not isinstance(medicines, list):
-            continue
-        
-        for med in medicines:
-            med_name = (med.get("medicine_name", "") or "").strip()
-            if not med_name:
-                continue
-            
-            # 중복 제거 (같은 약 이름은 한 번만)
-            if med_name.lower() not in medicine_names_seen:
-                medicine_names_seen.add(med_name.lower())
-                all_medicines.append({
-                    "medicine_name": med_name,
-                    "dosage_instructions": (med.get("dosage_instructions", "") or "").strip(),
-                    "frequency": (med.get("frequency", "") or "").strip(),
-                    "med_features": med.get("med_features", {})
-                })
-    
-    merged["medicines"] = all_medicines
-    diag["medicines"] = {"count": len(all_medicines), "names": [m["medicine_name"] for m in all_medicines]}
-    
+    fields = ["patient_name","age","dispense_date","pharmacy_name","prescription_number","medicine_name","dosage_instructions","frequency"]
+    merged, diag = {}, {}
+    results=[]
+    for d in json_list:
+        res = dict(d or {})
+        mf = res.get("med_features", {}) or {}
+        res["_mf_description"] = str(mf.get("description", "") or "").strip()
+        res["_mf_indications"] = str(mf.get("indications", "") or "").strip()
+        res["_mf_cautions"]    = str(mf.get("cautions", "")    or "").strip()
+        results.append(res)
+    for k in fields:
+        vals = [str(r.get(k, "") or "").strip() for r in results]
+        if k == "age":
+            norm=[_digits_only(v) for v in vals]; best,conf=_majority_merge(norm)
+            merged[k]=best; diag[k]={"per_shot":vals,"normalized":norm,"selected":best,"confidence":conf}
+        elif k == "prescription_number":
+            only=[_digits_only(v) for v in vals]; best_d,conf_d=_majority_merge(only)
+            if best_d: merged[k]=best_d; diag[k]={"per_shot":vals,"digits_only":only,"selected":best_d,"confidence":conf_d}
+            else: best,conf=_majority_merge(vals); merged[k]=best; diag[k]={"per_shot":vals,"selected":best,"confidence":conf}
+        else:
+            best,conf=_majority_merge(vals); merged[k]=best; diag[k]={"per_shot":vals,"selected":best,"confidence":conf}
+    for subk in ["description","indications","cautions"]:
+        key=f"_mf_{subk}"; vals=[r.get(key,"") for r in results]; best,conf=_majority_merge(vals); diag[key] = {"per_shot":vals,"selected":best,"confidence":conf}
+    merged["med_features"] = {"description":diag["_mf_description"]["selected"],"indications":diag["_mf_indications"]["selected"],"cautions":diag["_mf_cautions"]["selected"]}
+    del diag["_mf_description"]; del diag["_mf_indications"]; del diag["_mf_cautions"]
     return merged, diag
-
-
-def _find_medicine_in_db(medicine_name: str) -> List[Medicine]:
-    """DB에서 약 검색 - 더 유연한 매칭"""
-    if not medicine_name:
-        return []
-    
-    # 공백 제거 및 소문자 변환
-    search_name = medicine_name.strip()
-    
-    # 1차 검색: 정확한 이름
-    medicines = Medicine.objects.filter(item_name__iexact=search_name)[:1]
-    if medicines.exists():
-        return list(medicines)
-    
-    # 2차 검색: 부분 일치 (대소문자 무시)
-    medicines = Medicine.objects.filter(item_name__icontains=search_name)[:3]
-    if medicines.exists():
-        return list(medicines)
-    
-    # 3차 검색: 공백 제거하고 검색
-    search_no_space = search_name.replace(" ", "")
-    if search_no_space:
-        medicines = Medicine.objects.filter(
-            Q(item_name__icontains=search_no_space)
-        )[:3]
-        if medicines.exists():
-            return list(medicines)
-    
-    return []
-
-
-def _parse_date(date_str: str) -> str:
-    """날짜 문자열을 YYYY-MM-DD 형식으로 변환"""
-    if not date_str:
-        return ""
-    
-    # 이미 올바른 형식이면 그대로 반환
-    if re.match(r'^\d{4}-\d{2}-\d{2}$', date_str):
-        return date_str
-    
-    # YYYY.MM.DD 형식 변환
-    date_str = date_str.replace(".", "-")
-    
-    # YYYYMMDD 형식 변환
-    if re.match(r'^\d{8}$', date_str):
-        return f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}"
-    
-    return date_str
-
 
 @csrf_exempt
 def api_scan_envelope(request):
-    """
-    POST { images: [base64_jpeg, ...], meta?: [...] }
-    약봉투 스캔 후 자동 DB 저장
+    """POST { images: [base64_jpeg_without_prefix, ...], meta?: [{camera_index, shot_index, deviceId}, ...] }
+       - 카메라를 1~3대 선택하고 각 3연사(총 3~9장) 이미지를 보냄.
+       - meta 는 선택사항이며, 진단 정보에만 사용.
     """
     if request.method != "POST":
-        return JsonResponse({"error": "method_not_allowed"}, status=405)
+        return JsonResponse({"error":"method_not_allowed"}, status=405)
 
-    # API 키 확인
-    import local_settings
-    api_key = local_settings.OPENAI_API_KEY
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        return JsonResponse({"error": "missing_api_key"}, status=500)
+        return JsonResponse({"error":"missing_api_key"}, status=500)
 
-    # 이미지 데이터 추출
     images_b64 = []
     meta_in = []
     ctype = (request.headers.get('Content-Type') or '').lower()
-    
     try:
         if 'application/json' in ctype:
             payload = json.loads(request.body.decode('utf-8'))
             arr = payload.get('images') or []
-            if not isinstance(arr, list):
-                arr = []
-            images_b64 = [str(x or '').strip() for x in arr][:9]
+            if not isinstance(arr, list): arr=[]
+            images_b64 = [str(x or '').strip() for x in arr][:9]  # 최대 9장
             meta_in = payload.get('meta') or []
         else:
             f = request.FILES.get('image')
-            if not f:
-                return JsonResponse({"error": "no_image"}, status=400)
-            images_b64 = [f.read().decode('latin1')]
-            meta_in = [{"camera_index": 1, "shot_index": 1, "deviceId": "upload"}]
+            if not f: return JsonResponse({"error":"no_image"}, status=400)
+            images_b64 = [ (f.read()).decode('latin1') ]
+            meta_in = [{"camera_index":1, "shot_index":1, "deviceId":"upload"}]
     except Exception as e:
-        return JsonResponse({"error": "bad_payload", "detail": str(e)}, status=400)
+        return JsonResponse({"error":"bad_payload","detail":str(e)}, status=400)
 
     if not images_b64:
-        return JsonResponse({"error": "no_images"}, status=400)
+        return JsonResponse({"error":"no_images"}, status=400)
 
-    # OpenAI 호출
-    shots_raw = []
-    json_list = []
-    
-    for idx, b64 in enumerate(images_b64, 1):
+    shots_raw=[]; json_list=[]
+    for idx,b64 in enumerate(images_b64,1):
         b64 = re.sub(r'^data:image\/(png|jpeg);base64,', '', b64, flags=re.I)
         try:
-            raw = _call_openai_envelope(b64, api_key)
+            raw = _call_openai_envelope(b64)
             cleaned = _strip_code_fence(raw)
             try:
                 parsed = json.loads(cleaned)
             except Exception:
                 parsed = {}
-            
-            meta_obj = meta_in[idx - 1] if idx - 1 < len(meta_in) else None
-            shots_raw.append({
-                "index": idx,
-                "raw": cleaned,
-                "json": parsed,
-                "image_path": f"client_shot_{idx}",
-                "meta": meta_obj
-            })
+            meta_obj = meta_in[idx-1] if idx-1 < len(meta_in) else None
+            shots_raw.append({"index": idx, "raw": cleaned, "json": parsed, "image_path": f"client_shot_{idx}", "meta": meta_obj})
             json_list.append(parsed)
         except Exception as e:
-            meta_obj = meta_in[idx - 1] if idx - 1 < len(meta_in) else None
-            shots_raw.append({
-                "index": idx,
-                "raw": f"ERROR: {e}",
-                "json": {},
-                "image_path": None,
-                "meta": meta_obj
-            })
+            meta_obj = meta_in[idx-1] if idx-1 < len(meta_in) else None
+            shots_raw.append({"index": idx, "raw": f"ERROR: {e}", "json": {}, "image_path": None, "meta": meta_obj})
             json_list.append({})
 
-    # 결과 병합
     merged, diag = _merge_envelope_json(json_list)
 
-    # ⭐⭐⭐ DB 저장 로직 ⭐⭐⭐
-    saved_medicines = []
-    saved_count = 0
-    
-    # 사용자 가져오기 (TODO: 실제로는 request.user 사용)
-    user = User.objects.first()
-    if not user:
-        user = User.objects.create_user(username='guest', password='guest123')
-    
-    # 처방 정보
-    pharmacy_name = merged.get('pharmacy_name', '').strip()
-    hospital_name = merged.get('hospital_name', '').strip()
-    prescription_date = _parse_date(merged.get('dispense_date', ''))
-    
-    # ⭐ medicines 배열에서 각 약마다 처리
-    medicines_list = merged.get('medicines', [])
-    
-    if not medicines_list:
-        return JsonResponse({
-            "error": "no_medicines_found",
-            "message": "약 정보를 찾을 수 없습니다.",
-            "analysis_type": "envelope",
-            "shots": shots_raw,
-            "merged": merged,
-            "diagnostics": diag
-        }, status=200)
-    
-    for med_info in medicines_list:
-        medicine_name = med_info.get('medicine_name', '').strip()
-        dosage = med_info.get('dosage_instructions', '').strip()
-        frequency = med_info.get('frequency', '').strip()
-        
-        if not medicine_name:
-            continue
-        
-        # DB에서 약 검색
-        medicines = _find_medicine_in_db(medicine_name)
-        
-        if not medicines:
-            # DB에 없는 약
-            saved_medicines.append({
-                'medicine_name': medicine_name,
-                'found_in_db': False,
-                'message': 'DB에서 약을 찾을 수 없습니다.'
-            })
-            continue
-        
-        # 찾은 약마다 UserMedication에 저장
-        for medicine in medicines:
-            user_med, created = UserMedication.objects.get_or_create(
-                user=user,
-                medicine=medicine,
-                defaults={
-                    'dosage': dosage,
-                    'frequency': frequency,
-                    'pharmacy_name': pharmacy_name,
-                    'hospital_name': hospital_name,
-                    'prescription_date': prescription_date if prescription_date else None,
-                }
-            )
-            
-            if created:
-                saved_count += 1
-                saved_medicines.append({
-                    'medicine_id': medicine.item_seq,
-                    'medicine_name': medicine.item_name,
-                    'entp_name': medicine.entp_name,
-                    'found_in_db': True,
-                    'created': True,
-                    'dosage': dosage,
-                    'frequency': frequency
-                })
-            else:
-                # 이미 있으면 정보 업데이트
-                updated_fields = []
-                if dosage and dosage != user_med.dosage:
-                    user_med.dosage = dosage
-                    updated_fields.append('dosage')
-                if frequency and frequency != user_med.frequency:
-                    user_med.frequency = frequency
-                    updated_fields.append('frequency')
-                if pharmacy_name and pharmacy_name != user_med.pharmacy_name:
-                    user_med.pharmacy_name = pharmacy_name
-                    updated_fields.append('pharmacy_name')
-                if prescription_date and prescription_date != str(user_med.prescription_date or ''):
-                    user_med.prescription_date = prescription_date
-                    updated_fields.append('prescription_date')
-                
-                if updated_fields:
-                    user_med.save()
-                
-                saved_medicines.append({
-                    'medicine_id': medicine.item_seq,
-                    'medicine_name': medicine.item_name,
-                    'entp_name': medicine.entp_name,
-                    'found_in_db': True,
-                    'created': False,
-                    'updated': True,
-                    'updated_fields': updated_fields
-                })
+    # DB에 저장 (PillIdentification 모델 사용)
+    saved_id = None
+    try:
+        from .models import PillIdentification
+        from django.contrib.auth.models import User
 
-    # 결과 반환
+        # 기본 사용자 가져오기 (로그인 없는 경우)
+        if request.user.is_authenticated:
+            user = request.user
+        else:
+            user, _ = User.objects.get_or_create(username='default_user')
+
+        # DB 저장
+        pill_record = PillIdentification.objects.create(
+            user=user,
+            patient_name=merged.get('patient_name', ''),
+            age=merged.get('age', ''),
+            dispense_date=merged.get('dispense_date', '') or None,
+            pharmacy_name=merged.get('pharmacy_name', ''),
+            prescription_number=merged.get('prescription_number', ''),
+            medicine_name=merged.get('medicine_name', ''),
+            dosage_instructions=merged.get('dosage_instructions', ''),
+            frequency=merged.get('frequency', ''),
+            confidence_score=diag.get('medicine_name', {}).get('confidence', 0.0),
+            raw_response=json.dumps({"shots": shots_raw, "diagnostics": diag}, ensure_ascii=False)
+        )
+        saved_id = pill_record.id
+    except Exception as e:
+        logger.error(f"Failed to save pill identification to DB: {e}")
+        # DB 저장 실패해도 JSON은 반환
+
     out = {
         "analysis_type": "envelope",
         "shots": shots_raw,
         "merged": merged,
         "diagnostics": diag,
-        "saved_to_db": saved_count > 0,
-        "saved_count": saved_count,
-        "saved_medicines": saved_medicines,
-        "total_medicines_detected": len(medicines_list)
+        "saved_to_db": saved_id is not None,
+        "record_id": saved_id
     }
-    
     return JsonResponse(out, status=200)
 
-def delete_medication(request, medication_id):
-    from medicines.models import UserMedication
-    user = User.objects.first()  # TODO: request.user
-    
-    medication = UserMedication.objects.get(id=medication_id, user=user)
-    medication.delete()
-    
-    return redirect('/meds/')
 
-def medication_detail(request, medication_id):
-    medication = get_object_or_404(
-        UserMedication.objects.select_related('medicine', 'medicine__pill_info'),
-        id=medication_id,
-        user=request.user
-    )
-    return render(request, 'carepill/medication_detail.html', {
-        'medication': medication
-    })
+# ==================== ElevenLabs Voice 관련 API ====================
+
+from django.views.decorators.csrf import csrf_exempt
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+from .services.elevenlabs_service import ElevenLabsService
+from .models import VoiceUserVoice
+from django.contrib.auth.decorators import login_required
+import hashlib
+from datetime import datetime
+
+
+def voice_setup(request):
+    """음성 등록 페이지"""
+    return render(request, "carepill/voice_setup.html")
+
+
+@csrf_exempt
+def api_voice_upload(request):
+    """
+    음성 파일 업로드 및 ElevenLabs Voice Clone 생성
+
+    POST /api/voice/upload/
+    - voice_file: 음성 파일 (15초 이상)
+
+    Returns:
+        {
+            "success": bool,
+            "voice_id": str,
+            "message": str
+        }
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'POST method required'}, status=405)
+
+    voice_file = request.FILES.get('voice_file')
+    if not voice_file:
+        return JsonResponse({'success': False, 'message': '음성 파일이 필요합니다'}, status=400)
+
+    try:
+        # 현재 사용자 (로그인 없으면 기본 사용자 사용)
+        if request.user.is_authenticated:
+            user = request.user
+        else:
+            from django.contrib.auth.models import User
+            user, _ = User.objects.get_or_create(username='default_user')
+
+        # 파일 저장
+        file_hash = hashlib.md5(voice_file.read()).hexdigest()
+        voice_file.seek(0)  # 파일 포인터 리셋
+
+        filename = f"voice_{user.id}_{file_hash}.mp3"
+        filepath = default_storage.save(f'voices/{filename}', ContentFile(voice_file.read()))
+        full_path = os.path.join(default_storage.location, filepath)
+
+        # ElevenLabs Voice Clone 생성
+        elevenlabs = ElevenLabsService()
+        result = elevenlabs.create_voice_clone(
+            voice_file_path=full_path,
+            voice_name=f"{user.username}_voice",
+            remove_bg_noise=True
+        )
+
+        if result['success']:
+            # DB에 저장 또는 업데이트
+            voice_record, created = VoiceUserVoice.objects.get_or_create(user=user)
+            voice_record.voice_file = filepath
+            voice_record.voice_id = result['voice_id']
+            voice_record.is_active = True
+            voice_record.save()
+
+            return JsonResponse({
+                'success': True,
+                'voice_id': result['voice_id'],
+                'message': '음성이 성공적으로 등록되었습니다',
+                'created': created
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': result['message']
+            }, status=500)
+
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'오류 발생: {str(e)}'
+        }, status=500)
+
+
+@csrf_exempt
+def api_text_to_speech(request):
+    """
+    텍스트를 ElevenLabs TTS로 변환
+
+    POST /api/tts/
+    - text: 변환할 텍스트
+    - user_id: (선택) 사용자 ID (없으면 default_user)
+
+    Returns:
+        audio/mpeg (MP3 바이너리)
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'POST method required'}, status=405)
+
+    import json
+    try:
+        data = json.loads(request.body)
+    except:
+        data = request.POST
+
+    text = data.get('text')
+    if not text:
+        return JsonResponse({'success': False, 'message': '텍스트가 필요합니다'}, status=400)
+
+    try:
+        # 사용자 voice_id 조회
+        if request.user.is_authenticated:
+            user = request.user
+        else:
+            from django.contrib.auth.models import User
+            user = User.objects.filter(username='default_user').first()
+
+            # default_user가 없으면 생성
+            if not user:
+                logger.warning("default_user not found, creating...")
+                user, created = User.objects.get_or_create(username='default_user')
+                if created:
+                    logger.info("default_user created successfully")
+
+        # 음성 레코드 조회
+        try:
+            voice_record = VoiceUserVoice.objects.filter(user=user, is_active=True).first()
+        except Exception as db_error:
+            logger.error(f"Database error when querying VoiceUserVoice: {db_error}")
+            return JsonResponse({
+                'success': False,
+                'message': '음성 데이터 조회 중 오류 발생. 데이터베이스 마이그레이션을 확인해주세요.'
+            }, status=500)
+
+        if not voice_record or not voice_record.voice_id:
+            logger.info(f"No voice record found for user {user.username}")
+            return JsonResponse({
+                'success': False,
+                'message': '등록된 음성이 없습니다. 홈 화면에서 음성을 먼저 등록해주세요.'
+            }, status=404)
+
+        # ElevenLabs TTS 실행
+        try:
+            elevenlabs = ElevenLabsService()
+            audio_content = elevenlabs.text_to_speech(
+                voice_id=voice_record.voice_id,
+                text=text
+            )
+        except Exception as tts_error:
+            logger.error(f"ElevenLabs TTS error: {tts_error}")
+            return JsonResponse({
+                'success': False,
+                'message': f'TTS 서비스 오류: {str(tts_error)}'
+            }, status=500)
+
+        if audio_content:
+            from django.http import HttpResponse
+            response = HttpResponse(audio_content, content_type='audio/mpeg')
+            response['Content-Disposition'] = 'inline; filename="tts_output.mp3"'
+            return response
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': 'TTS 변환 실패: 오디오 생성되지 않음'
+            }, status=500)
+
+    except Exception as e:
+        logger.error(f"Unexpected error in api_text_to_speech: {e}", exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'message': f'예기치 않은 오류 발생: {str(e)}'
+        }, status=500)

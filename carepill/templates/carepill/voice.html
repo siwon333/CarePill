@@ -1,35 +1,517 @@
-{% extends "carepill/base.html" %}
 {% load static %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'carepill/css/voice.css' %}">{% endblock %}
-{% block title %}케어필과 대화 | CarePill{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'carepill/css/voice.css' %}">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alkatra:wght@400..700&family=Baloo+Bhaijaan+2:wght@400..800&family=Jua&family=Luckiest+Guy&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
+{% endblock %}
 
 {% block content %}
-<section class="page-section">
-  <h1 class="page-title">케어필과 대화</h1>
-  <p class="page-desc">실시간 보이스 인터페이스 (GPT Realtime)</p>
+<div class="voice-container">
+  <div class="voice-wrapper">
+    <!-- 배경 SVG (홈과 동일) -->
+    <svg class="voice-bg" viewBox="0 0 261 156" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="bgGradient" x1="158.58" y1="43.5349" x2="88.9886" y2="176.434" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="white" />
+          <stop offset="1" stop-color="#B8E6FF" />
+        </linearGradient>
 
-  <div class="chat-box">
-    <!-- ✅ 실시간 채팅 로그 -->
-    <div id="chatLog" style="height:340px; overflow:auto; padding:8px 4px;">
-      <!-- 여기에 실시간으로 말풍선이 추가됩니다 -->
+        <linearGradient id="brandGradient1" x1="58" y1="0" x2="58" y2="109.744" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#FFCF41" />
+          <stop offset="0.480769" stop-color="#FFB01F" />
+        </linearGradient>
+
+        <linearGradient id="brandGradient4" x1="58" y1="0" x2="58" y2="109.744" gradientUnits="userSpaceOnUse">
+          <stop offset="0.0961538" stop-color="#FFCF41" />
+          <stop offset="0.966346" stop-color="#FF9500" />
+        </linearGradient>
+
+        <linearGradient id="greenGradient" x1="0" y1="0" x2="100" y2="0" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#7FD896" />
+          <stop offset="1" stop-color="#4CAF50" />
+        </linearGradient>
+
+        <linearGradient id="redGradient" x1="0" y1="0" x2="100" y2="0" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#FF6B6B" />
+          <stop offset="1" stop-color="#EE5A6F" />
+        </linearGradient>
+
+        <linearGradient id="purpleGradient" x1="0" y1="0" x2="100" y2="0" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#C084FC" />
+          <stop offset="1" stop-color="#9333EA" />
+        </linearGradient>
+
+        <filter id="innerShadow" x="0" y="0" width="116" height="113.903" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+          <feFlood flood-opacity="0" result="BackgroundImageFix" />
+          <feBlend in="SourceGraphic" in2="BackgroundImageFix" mode="normal" result="shape" />
+          <feColorMatrix in="SourceAlpha" result="hardAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" />
+          <feOffset dy="4" />
+          <feGaussianBlur stdDeviation="4.15" />
+          <feComposite in2="hardAlpha" k2="-1" k3="1" operator="arithmetic" />
+          <feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.5 0" />
+          <feBlend in2="shape" mode="normal" result="effect1_innerShadow" />
+        </filter>
+
+        <clipPath id="pill1-right">
+          <rect x="146" y="5.44" width="18" height="7.26" />
+        </clipPath>
+        <clipPath id="pill2-right">
+          <rect x="189" y="5.44" width="18" height="7.26" />
+        </clipPath>
+        <clipPath id="pill3-right">
+          <rect x="233" y="5.44" width="18" height="7.26" />
+        </clipPath>
+      </defs>
+
+      <path d="M0 10C0 4.47716 4.47715 0 10 0H251C256.523 0 261 4.47715 261 10V146C261 151.523 256.523 156 251 156H10C4.47715 156 0 151.523 0 146V10Z" fill="url(#bgGradient)" />
+
+      <a href="/scan/">
+        <rect x="128" y="5.44" width="36" height="7.26" rx="3.63" fill="#FFD39E" />
+        <rect x="128" y="5.44" width="36" height="7.26" rx="3.63" fill="#FFBD67" clip-path="url(#pill1-right)" />
+        <line x1="146" y1="5.44" x2="146" y2="12.7" stroke="#FFE8C8" stroke-width="0.8" />
+      </a>
+
+      <a href="/voice_setup/">
+        <rect x="171" y="5.44" width="36" height="7.26" rx="3.63" fill="#A5C9FF" />
+        <rect x="171" y="5.44" width="36" height="7.26" rx="3.63" fill="#8FB8FF" clip-path="url(#pill2-right)" />
+        <line x1="189" y1="5.44" x2="189" y2="12.7" stroke="#C8DEFF" stroke-width="0.8" />
+      </a>
+
+      <a href="/">
+        <rect x="215" y="5.44" width="36" height="7.26" rx="3.63" fill="#F3B8FF" />
+        <rect x="215" y="5.44" width="36" height="7.26" rx="3.63" fill="#EDA3FF" clip-path="url(#pill3-right)" />
+        <line x1="233" y1="5.44" x2="233" y2="12.7" stroke="#F8D6FF" stroke-width="0.8" />
+      </a>
+    </svg>
+
+    <a href="/" class="brand-blob-container">
+      <svg viewBox="0 0 116 110" fill="none" class="brand-blob-svg">
+        <g filter="url(#innerShadow)">
+          <path d="M86.7207 52.7973C86.7207 66.1295 75.3633 76.9373 61.3531 76.9373C47.343 76.9373 35.9855 66.1295 35.9855 52.7973C35.9855 39.4652 47.343 28.6574 61.3531 28.6574C75.3633 28.6574 86.7207 39.4652 86.7207 52.7973Z" fill="url(#brandGradient1)" />
+          <path d="M13.4365 21.968C13.4365 16.4452 17.9136 11.968 23.4365 11.968H51.6663C57.1891 11.968 61.6663 16.4452 61.6663 21.968V66.9373C61.6663 72.4601 57.1891 76.9373 51.6663 76.9373H23.4365C17.9136 76.9373 13.4365 72.4602 13.4365 66.9373V21.968Z" fill="url(#brandGradient1)" />
+          <path d="M87.6049 11.968C91.2366 11.968 94.7398 13.8991 95.7443 17.3891C96.3949 19.6492 96.7425 22.0284 96.7425 24.485C96.7425 39.2985 84.1231 51.3072 68.5563 51.3072C52.9894 51.3072 40.37 39.2985 40.37 24.485C40.37 22.0284 40.7177 19.6492 41.3682 17.3891C42.3728 13.8991 45.8759 11.968 49.5076 11.968H87.6049Z" fill="url(#brandGradient1)" />
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M104.604 0C105.625 0 106.636 0.299612 107.407 0.96923C108.55 1.9624 109.311 2.91225 109.669 3.37936C110.456 4.406 111.026 5.39079 111.38 6.04412C112.152 7.46625 112.85 9.08508 113.445 10.7625C114.644 14.146 115.756 18.7027 115.966 23.9135C116.276 31.627 114.545 41.0153 108.223 49.5805C106.636 51.73 105.717 54.3138 105.603 56.9829C105.41 61.5308 104.464 66.4227 102.327 71.2463C97.281 82.6366 86.5254 91.4988 69.7935 94.5304L12.1298 107.1C5.89532 108.459 0 103.71 0 97.3295V10C0 4.47715 4.47715 0 10 0H104.604ZM29.1123 60.2928C29.1123 66.6736 35.0075 71.4223 41.242 70.0634L63.0735 65.3049L63.4077 65.2314L63.7453 65.173C67.7753 64.4699 69.9704 63.3089 71.1424 62.4448C72.2859 61.6017 72.9786 60.659 73.45 59.5947C74.5716 57.0628 74.4532 53.6443 73.7982 51.4685L72.8823 48.4262C71.6548 44.3486 73.1441 39.941 76.5934 37.4437L79.3897 35.419C83.877 32.1701 79.8354 26.9281 74.2955 26.9281H39.1123C33.5895 26.9281 29.1123 31.4052 29.1123 36.9281V60.2928Z" fill="url(#brandGradient4)" />
+          <path d="M16.9619 106.059L0 109.903V98.8476L14.0938 95.6533L16.9619 106.059Z" fill="#FF9E02" />
+        </g>
+      </svg>
+
+      <p class="brand-subtitle">당신의 복약을 더 쉽고、안전하게</p>
+      <h1 class="brand-title">CARE<br>PILL</h1>
+    </a>
+
+    <!-- Control buttons (outside brand-blob) -->
+    <div class="control-buttons">
+      <button type="button" class="control-btn" id="startRtc" aria-label="실시간 대화 시작">
+        <svg viewBox="0 0 100 30" class="control-btn-svg" preserveAspectRatio="none">
+          <rect x="0" y="0" width="100" height="30" rx="15" fill="url(#greenGradient)" opacity="0.9" />
+        </svg>
+        <span class="control-icon">🎤</span>
+        <span class="control-text">시작</span>
+      </button>
+
+      <button type="button" class="control-btn" id="stopRtc" style="display:none;" aria-label="종료">
+        <svg viewBox="0 0 100 30" class="control-btn-svg" preserveAspectRatio="none">
+          <rect x="0" y="0" width="100" height="30" rx="15" fill="url(#redGradient)" opacity="0.9" />
+        </svg>
+        <span class="control-icon">🛑</span>
+        <span class="control-text">종료</span>
+      </button>
     </div>
 
-    <div class="input-row" style="margin-top:14px">
-      <button id="startRtc" class="primary-btn">🎤 실시간 대화 시작</button>
-      <button id="stopRtc" class="primary-btn" style="display:none;background:#888">🛑 종료</button>
-      <button id="openSummary" class="primary-btn">대화 요약</button>
+    <div class="chat-container">
+      <div class="chat-frame">
+        <div id="chatLog" class="chat-log">
+          <div class="chat-welcome">
+            <p>🎤 케어필과 음성 대화를 시작하세요</p>
+            <p class="chat-hint">실시간으로 대화 내용이 표시됩니다</p>
+          </div>
+        </div>
+        <div id="rt-status" class="chat-status">대기 중</div>
+      </div>
     </div>
 
-    <!-- 모델의 음성 출력 -->
-    <audio id="remoteAudio" autoplay></audio>
+    <div class="mini-tabs">
+      <span class="mini-tab-text">약 봉투 스캔</span>
+      <span class="mini-tab-text">음성 등록</span>
+      <span class="mini-tab-text" id="settingsTab" style="cursor: pointer;">설정</span>
+    </div>
 
-    <!-- (선택) 상태 텍스트 -->
-    <p id="rt-status" class="page-desc" style="margin-top:10px;">대기 중</p>
   </div>
-</section>
+</div>
 
-<script src="{% static 'carepill/js/realtime_webrtc_chat.js' %}?v=20251007-1"></script>
-<script src="{% static 'carepill/js/summary_overlay.js' %}"></script>
+<audio id="remoteAudio" autoplay></audio>
 
+<script>
+/**
+ * 약 배출 알림 기능 (INLINE)
+ */
+console.log('[INLINE] MedicineDispenser 스크립트 시작');
 
+class MedicineDispenser {
+  constructor() {
+    this.overlay = null;
+    this.currentAudio = null;
+  }
+
+  showDispenseNotification(medicineName, message, audioFiles) {
+    console.log('[MedicineDispenser] 알림 표시 시작:', { medicineName, message, audioFiles });
+
+    this.hideNotification();
+
+    this.overlay = document.createElement('div');
+    this.overlay.className = 'dispense-notification';
+    this.overlay.innerHTML = `
+      <div class="dispense-card">
+        <div class="dispense-icon">💊</div>
+        <div class="dispense-message">${message}</div>
+      </div>
+    `;
+
+    this.addStyles();
+    document.body.appendChild(this.overlay);
+
+    setTimeout(() => {
+      this.overlay.classList.add('show');
+    }, 10);
+
+    // audioFiles가 배열이면 순차 재생, 아니면 단일 재생
+    if (Array.isArray(audioFiles)) {
+      this.playAudioSequence(audioFiles);
+    } else {
+      this.playAudio(audioFiles);
+    }
+
+    // 10초 후 자동으로 닫기
+    setTimeout(() => {
+      this.hideNotification();
+    }, 10000);
+  }
+
+  playAudioSequence(fileNames) {
+    console.log('[MedicineDispenser] 순차 오디오 재생 시작:', fileNames);
+
+    if (!Array.isArray(fileNames) || fileNames.length === 0) {
+      return;
+    }
+
+    let currentIndex = 0;
+
+    const playNext = () => {
+      if (currentIndex >= fileNames.length) {
+        console.log('[MedicineDispenser] 모든 오디오 재생 완료');
+        return;
+      }
+
+      const fileName = fileNames[currentIndex];
+      console.log(`[MedicineDispenser] ${currentIndex + 1}/${fileNames.length} 재생 중: ${fileName}`);
+
+      this.playAudioWithCallback(fileName, () => {
+        currentIndex++;
+        playNext();
+      });
+    };
+
+    playNext();
+  }
+
+  playAudioWithCallback(fileName, onEndedCallback) {
+    if (this.currentAudio) {
+      this.currentAudio.pause();
+      this.currentAudio.currentTime = 0;
+      this.currentAudio = null;
+    }
+
+    try {
+      const audioPath = `/static/carepill/audio/${fileName}`;
+      console.log('[MedicineDispenser] 오디오 경로:', audioPath);
+
+      this.currentAudio = new Audio();
+
+      this.currentAudio.onloadeddata = () => {
+        console.log('[MedicineDispenser] 오디오 파일 로드 완료');
+      };
+
+      this.currentAudio.oncanplay = () => {
+        console.log('[MedicineDispenser] 오디오 재생 가능 상태');
+      };
+
+      this.currentAudio.onplay = () => {
+        console.log('[MedicineDispenser] 오디오 재생 시작됨');
+      };
+
+      this.currentAudio.onended = () => {
+        console.log('[MedicineDispenser] 오디오 재생 완료');
+        this.currentAudio = null;
+        if (onEndedCallback) {
+          onEndedCallback();
+        }
+      };
+
+      this.currentAudio.onerror = (error) => {
+        console.error('[MedicineDispenser] 음성 재생 오류:', error);
+        this.currentAudio = null;
+        // 오류 발생해도 다음 파일 재생
+        if (onEndedCallback) {
+          onEndedCallback();
+        }
+      };
+
+      this.currentAudio.src = audioPath;
+      this.currentAudio.load();
+
+      const playPromise = this.currentAudio.play();
+
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log('[MedicineDispenser] ✅ 오디오 재생 성공!');
+          })
+          .catch(err => {
+            console.error('[MedicineDispenser] ❌ 음성 재생 실패:', err.name, err.message);
+            if (err.name === 'NotAllowedError') {
+              console.error('[MedicineDispenser] 브라우저 자동재생 정책으로 차단됨. 사용자 인터랙션 필요.');
+            }
+            // 재생 실패해도 다음 파일로
+            if (onEndedCallback) {
+              onEndedCallback();
+            }
+          });
+      }
+
+    } catch (err) {
+      console.error('[MedicineDispenser] 음성 파일 로드 오류:', err);
+      if (onEndedCallback) {
+        onEndedCallback();
+      }
+    }
+  }
+
+  playAudio(fileName) {
+    this.playAudioWithCallback(fileName, null);
+  }
+
+  hideNotification() {
+    if (this.overlay) {
+      this.overlay.classList.remove('show');
+      setTimeout(() => {
+        if (this.overlay && this.overlay.parentNode) {
+          this.overlay.parentNode.removeChild(this.overlay);
+        }
+        this.overlay = null;
+      }, 300);
+    }
+
+    if (this.currentAudio) {
+      this.currentAudio.pause();
+      this.currentAudio.currentTime = 0;
+      this.currentAudio = null;
+    }
+  }
+
+  addStyles() {
+    if (document.getElementById('dispense-notification-styles')) {
+      return;
+    }
+
+    const style = document.createElement('style');
+    style.id = 'dispense-notification-styles';
+    style.textContent = `
+      .dispense-notification {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 10000;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+
+      .dispense-notification.show {
+        opacity: 1;
+      }
+
+      .dispense-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 30px 40px;
+        border-radius: 20px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        text-align: center;
+        min-width: 300px;
+        animation: slideUp 0.3s ease;
+      }
+
+      @keyframes slideUp {
+        from {
+          transform: translateY(20px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+
+      .dispense-icon {
+        font-size: 48px;
+        margin-bottom: 15px;
+        animation: pulse 1.5s infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.1);
+        }
+      }
+
+      .dispense-message {
+        font-size: 20px;
+        font-weight: 600;
+        line-height: 1.4;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+
+  dispenseMedicine(medicineName) {
+    console.log('[MedicineDispenser] dispenseMedicine 호출됨, 약 이름:', medicineName);
+
+    const medicineMap = {
+      '확펜': {
+        message: '확펜이 나오고있습니다',
+        audio: ['확펜이 나오고있습니다.mp3', '편두통이.mp3']
+      },
+      '처방약': {
+        message: '처방약이 배출되고있습니다',
+        audio: '처방약이 배출되고있습니다.mp3'
+      },
+      '킴스약국': {
+        message: '처방약이 배출되고있습니다',
+        audio: '처방약이 배출되고있습니다.mp3'
+      }
+    };
+
+    const medicine = medicineMap[medicineName];
+    if (medicine) {
+      console.log('[MedicineDispenser] 약 정보 찾음:', medicine);
+      this.showDispenseNotification(medicineName, medicine.message, medicine.audio);
+    } else {
+      console.warn('[MedicineDispenser] 알 수 없는 약 이름:', medicineName);
+    }
+  }
+}
+
+// 전역 인스턴스 생성
+console.log('[MedicineDispenser] 클래스 정의 완료, 인스턴스 생성 시작');
+window.MedicineDispenser = new MedicineDispenser();
+console.log('[MedicineDispenser] 인스턴스 생성 완료, window.MedicineDispenser =', window.MedicineDispenser);
+
+// 전역 함수로 노출
+window.dispenseMedicine = function(medicineName) {
+  window.MedicineDispenser.dispenseMedicine(medicineName);
+};
+
+// 오디오 컨텍스트 활성화 함수
+window.unlockAudioContext = function() {
+  console.log('[MedicineDispenser] 오디오 컨텍스트 unlock 시도');
+
+  // 더미 오디오 재생으로 컨텍스트 활성화
+  const silentAudio = new Audio();
+  silentAudio.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAADhAC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAA4T/hVmVAAAAAAD/+xBkAAP8AAAaQAAAAgAAA0gAAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+
+  const playPromise = silentAudio.play();
+
+  if (playPromise !== undefined) {
+    playPromise
+      .then(() => {
+        console.log('[MedicineDispenser] ✅ 오디오 컨텍스트 unlock 성공!');
+        silentAudio.pause();
+        silentAudio.currentTime = 0;
+      })
+      .catch(err => {
+        console.log('[MedicineDispenser] 오디오 unlock 실패 (예상됨):', err.name);
+      });
+  }
+};
+
+// 페이지의 첫 사용자 인터랙션에서 오디오 unlock
+let audioUnlocked = false;
+function tryUnlockAudio() {
+  if (!audioUnlocked && window.unlockAudioContext) {
+    window.unlockAudioContext();
+    audioUnlocked = true;
+    console.log('[MedicineDispenser] 사용자 인터랙션으로 오디오 unlock 시도 완료');
+  }
+}
+
+// 다양한 이벤트에서 unlock 시도
+document.addEventListener('click', tryUnlockAudio, { once: true });
+document.addEventListener('touchstart', tryUnlockAudio, { once: true });
+document.addEventListener('keydown', tryUnlockAudio, { once: true });
+
+console.log('[INLINE] MedicineDispenser 스크립트 완료');
+</script>
+
+<script src="{% static 'carepill/js/voice_navigation.js' %}?v=20251105-6"></script>
+<script src="{% static 'carepill/js/realtime_webrtc_chat.js' %}?v=20251105-2"></script>
+<script>
+// 음성 네비게이션
+document.addEventListener('DOMContentLoaded', function() {
+  // 페이지 로드 시 자동으로 음성 대화 시작
+  setTimeout(() => {
+    const startBtn = document.getElementById('startRtc');
+    if (startBtn && startBtn.style.display !== 'none') {
+      console.log('자동으로 음성 대화 시작');
+      startBtn.click();
+    }
+  }, 1000);
+
+  // 설정 탭 클릭 이벤트 (토글)
+  const settingsTab = document.getElementById('settingsTab');
+  if (settingsTab) {
+    settingsTab.addEventListener('click', function() {
+      toggleVoiceRecognition();
+    });
+  }
+
+  // 페이지 로드 시 자동 시작
+  if (window.voiceNavigator) {
+    window.voiceNavigator.autoStart(
+      function(status, message) {
+        console.log(`상태: ${status}, 메시지: ${message}`);
+      },
+      function(command, url) {
+        console.log(`명령어 인식: ${command} → ${url}`);
+      }
+    );
+  }
+
+  // 음성 인식 토글 함수 (UI 변화 없음)
+  window.toggleVoiceRecognition = function() {
+    if (!window.voiceNavigator) {
+      console.error('음성 인식을 사용할 수 없습니다.');
+      return;
+    }
+
+    const isEnabled = window.voiceNavigator.toggle(
+      function(status, message) {
+        console.log(`상태: ${status}, 메시지: ${message}`);
+      },
+      function(command, url) {
+        console.log(`명령어 인식: ${command} → ${url}`);
+      }
+    );
+
+    console.log(isEnabled ? '음성 인식 활성화됨' : '음성 인식 비활성화됨');
+  };
+});
+</script>
 {% endblock %}

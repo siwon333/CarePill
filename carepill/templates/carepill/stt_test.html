@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>STT 진단 도구</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      border-bottom: 3px solid #4CAF50;
+      padding-bottom: 10px;
+    }
+    .status {
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 5px;
+      font-weight: bold;
+    }
+    .success { background: #d4edda; color: #155724; border-left: 4px solid #28a745; }
+    .error { background: #f8d7da; color: #721c24; border-left: 4px solid #dc3545; }
+    .warning { background: #fff3cd; color: #856404; border-left: 4px solid #ffc107; }
+    .info { background: #d1ecf1; color: #0c5460; border-left: 4px solid #17a2b8; }
+    button {
+      background: #4CAF50;
+      color: white;
+      padding: 12px 30px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 10px 5px;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .log {
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 5px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 14px;
+    }
+    .log-entry {
+      margin: 5px 0;
+      padding: 5px;
+      border-bottom: 1px solid #eee;
+    }
+    .section {
+      margin: 30px 0;
+      padding: 20px;
+      background: #fafafa;
+      border-radius: 5px;
+    }
+    .section h2 {
+      margin-top: 0;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>🎤 STT 진단 도구 (라즈베리파이 전용)</h1>
+
+  <div class="section">
+    <h2>1️⃣ 환경 확인</h2>
+    <div id="envCheck"></div>
+  </div>
+
+  <div class="section">
+    <h2>2️⃣ 브라우저 지원 확인</h2>
+    <div id="browserCheck"></div>
+  </div>
+
+  <div class="section">
+    <h2>3️⃣ 보안 프로토콜 확인</h2>
+    <div id="securityCheck"></div>
+  </div>
+
+  <div class="section">
+    <h2>4️⃣ 마이크 권한 확인</h2>
+    <button id="checkMic">마이크 권한 요청</button>
+    <div id="micCheck"></div>
+  </div>
+
+  <div class="section">
+    <h2>5️⃣ STT 테스트</h2>
+    <button id="startTest" disabled>음성 인식 시작</button>
+    <button id="stopTest" disabled>음성 인식 종료</button>
+    <div id="sttResult"></div>
+    <div class="log" id="sttLog"></div>
+  </div>
+
+  <div class="section">
+    <h2>📋 해결 방법</h2>
+    <div id="solutions"></div>
+  </div>
+</div>
+
+<script>
+let recognition = null;
+
+// 로그 출력 함수
+function log(message, type = 'info') {
+  const logDiv = document.getElementById('sttLog');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  const timestamp = new Date().toLocaleTimeString();
+  entry.textContent = `[${timestamp}] ${message}`;
+  logDiv.appendChild(entry);
+  logDiv.scrollTop = logDiv.scrollHeight;
+  console.log(message);
+}
+
+// 1. 환경 확인
+function checkEnvironment() {
+  const envDiv = document.getElementById('envCheck');
+  let html = '';
+
+  html += `<div class="status info">
+    <strong>URL:</strong> ${window.location.href}<br>
+    <strong>프로토콜:</strong> ${window.location.protocol}<br>
+    <strong>호스트:</strong> ${window.location.hostname}<br>
+    <strong>User Agent:</strong> ${navigator.userAgent}
+  </div>`;
+
+  // Chromium 버전 확인
+  const chromiumMatch = navigator.userAgent.match(/Chrom(e|ium)\/([0-9]+)\./);
+  if (chromiumMatch) {
+    html += `<div class="status success">
+      ✅ Chromium 버전: ${chromiumMatch[2]}
+    </div>`;
+  } else {
+    html += `<div class="status error">
+      ❌ Chromium을 감지할 수 없습니다
+    </div>`;
+  }
+
+  envDiv.innerHTML = html;
+}
+
+// 2. 브라우저 지원 확인
+function checkBrowserSupport() {
+  const browserDiv = document.getElementById('browserCheck');
+  let html = '';
+
+  if ('webkitSpeechRecognition' in window) {
+    html += `<div class="status success">
+      ✅ webkitSpeechRecognition 지원됨
+    </div>`;
+  } else if ('SpeechRecognition' in window) {
+    html += `<div class="status success">
+      ✅ SpeechRecognition 지원됨
+    </div>`;
+  } else {
+    html += `<div class="status error">
+      ❌ Web Speech API를 지원하지 않습니다<br>
+      → Chromium 버전을 업데이트하거나 다른 브라우저를 사용하세요
+    </div>`;
+  }
+
+  // MediaDevices API 확인
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    html += `<div class="status success">
+      ✅ MediaDevices API 지원됨
+    </div>`;
+  } else {
+    html += `<div class="status error">
+      ❌ MediaDevices API를 지원하지 않습니다
+    </div>`;
+  }
+
+  browserDiv.innerHTML = html;
+}
+
+// 3. 보안 프로토콜 확인
+function checkSecurity() {
+  const securityDiv = document.getElementById('securityCheck');
+  let html = '';
+
+  const isSecure = window.location.protocol === 'https:';
+  const isLocalhost = window.location.hostname === 'localhost' ||
+                      window.location.hostname === '127.0.0.1' ||
+                      window.location.hostname === '[::1]';
+
+  if (isSecure) {
+    html += `<div class="status success">
+      ✅ HTTPS 연결 - 보안 요구사항 충족
+    </div>`;
+  } else if (isLocalhost) {
+    html += `<div class="status success">
+      ✅ localhost 연결 - 보안 요구사항 충족
+    </div>`;
+  } else {
+    html += `<div class="status error">
+      ❌ HTTP 연결 - Web Speech API는 HTTPS 또는 localhost에서만 작동합니다<br>
+      <strong>현재 프로토콜:</strong> ${window.location.protocol}
+    </div>`;
+  }
+
+  // 인터넷 연결 확인
+  if (navigator.onLine) {
+    html += `<div class="status success">
+      ✅ 인터넷 연결됨
+    </div>`;
+  } else {
+    html += `<div class="status error">
+      ❌ 인터넷 연결 안 됨 - Google STT 서버 접속 불가
+    </div>`;
+  }
+
+  securityDiv.innerHTML = html;
+}
+
+// 4. 마이크 권한 확인
+document.getElementById('checkMic').addEventListener('click', async () => {
+  const micDiv = document.getElementById('micCheck');
+  micDiv.innerHTML = '<div class="status info">⏳ 마이크 권한을 요청하는 중...</div>';
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    micDiv.innerHTML = '<div class="status success">✅ 마이크 권한 허용됨</div>';
+
+    // 오디오 트랙 정보 표시
+    const audioTracks = stream.getAudioTracks();
+    if (audioTracks.length > 0) {
+      micDiv.innerHTML += `<div class="status info">
+        <strong>마이크:</strong> ${audioTracks[0].label}
+      </div>`;
+    }
+
+    // 스트림 정리
+    stream.getTracks().forEach(track => track.stop());
+
+    // STT 테스트 버튼 활성화
+    document.getElementById('startTest').disabled = false;
+    log('마이크 권한 허용됨', 'success');
+  } catch (error) {
+    micDiv.innerHTML = `<div class="status error">
+      ❌ 마이크 권한 거부됨<br>
+      <strong>에러:</strong> ${error.message}<br>
+      <strong>해결:</strong> 브라우저 설정에서 마이크 권한을 허용하세요
+    </div>`;
+    log(`마이크 권한 오류: ${error.message}`, 'error');
+  }
+});
+
+// 5. STT 테스트
+document.getElementById('startTest').addEventListener('click', () => {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    alert('이 브라우저는 음성 인식을 지원하지 않습니다');
+    return;
+  }
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SpeechRecognition();
+
+  recognition.lang = 'ko-KR';
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.maxAlternatives = 3;
+
+  recognition.onstart = () => {
+    log('🎤 음성 인식 시작됨', 'success');
+    document.getElementById('sttResult').innerHTML =
+      '<div class="status success">🎤 듣고 있습니다... 말씀해주세요</div>';
+    document.getElementById('startTest').disabled = true;
+    document.getElementById('stopTest').disabled = false;
+  };
+
+  recognition.onresult = (event) => {
+    const last = event.results.length - 1;
+    const result = event.results[last];
+    const transcript = result[0].transcript;
+    const confidence = result[0].confidence;
+    const isFinal = result.isFinal;
+
+    log(`${isFinal ? '✅ 최종' : '⏳ 임시'}: "${transcript}" (신뢰도: ${(confidence * 100).toFixed(1)}%)`);
+
+    if (isFinal) {
+      document.getElementById('sttResult').innerHTML = `
+        <div class="status success">
+          <strong>인식된 텍스트:</strong> ${transcript}<br>
+          <strong>신뢰도:</strong> ${(confidence * 100).toFixed(1)}%
+        </div>`;
+    } else {
+      document.getElementById('sttResult').innerHTML = `
+        <div class="status info">
+          <strong>실시간:</strong> ${transcript}
+        </div>`;
+    }
+  };
+
+  recognition.onerror = (event) => {
+    log(`❌ 오류: ${event.error}`, 'error');
+    document.getElementById('sttResult').innerHTML = `
+      <div class="status error">
+        ❌ 오류 발생: ${event.error}<br>
+        ${getErrorHelp(event.error)}
+      </div>`;
+    document.getElementById('startTest').disabled = false;
+    document.getElementById('stopTest').disabled = true;
+  };
+
+  recognition.onend = () => {
+    log('음성 인식 종료됨', 'info');
+    document.getElementById('startTest').disabled = false;
+    document.getElementById('stopTest').disabled = true;
+  };
+
+  try {
+    recognition.start();
+  } catch (error) {
+    log(`시작 실패: ${error.message}`, 'error');
+    alert(`음성 인식 시작 실패: ${error.message}`);
+  }
+});
+
+document.getElementById('stopTest').addEventListener('click', () => {
+  if (recognition) {
+    recognition.stop();
+  }
+});
+
+// 오류별 도움말
+function getErrorHelp(error) {
+  const helpMap = {
+    'not-allowed': '마이크 권한이 거부되었습니다. 브라우저 설정에서 마이크 권한을 허용하세요.',
+    'no-speech': '음성이 감지되지 않았습니다. 마이크가 제대로 연결되었는지 확인하세요.',
+    'audio-capture': '마이크를 찾을 수 없습니다. 마이크가 연결되어 있는지 확인하세요.',
+    'network': '네트워크 오류가 발생했습니다. 인터넷 연결을 확인하세요.',
+    'service-not-allowed': 'HTTPS 또는 localhost에서만 사용 가능합니다.',
+    'aborted': '음성 인식이 중단되었습니다.'
+  };
+  return helpMap[error] || '알 수 없는 오류입니다.';
+}
+
+// 해결 방법 표시
+function showSolutions() {
+  const solutionsDiv = document.getElementById('solutions');
+  const isSecure = window.location.protocol === 'https:';
+  const isLocalhost = window.location.hostname === 'localhost' ||
+                      window.location.hostname === '127.0.0.1';
+
+  let solutions = '';
+
+  if (!isSecure && !isLocalhost) {
+    solutions += `
+      <div class="status error">
+        <h3>❌ HTTPS 문제 해결 방법</h3>
+        <ol>
+          <li><strong>Django에서 HTTPS 활성화:</strong>
+            <pre style="background:#f4f4f4; padding:10px; border-radius:5px;">
+# settings.py에 추가
+SECURE_SSL_REDIRECT = False  # 개발 중에는 False
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
+
+# 라즈베리파이에서 실행
+python manage.py runserver 0.0.0.0:8000</pre>
+          </li>
+          <li><strong>ngrok 사용 (가장 쉬움):</strong>
+            <pre style="background:#f4f4f4; padding:10px; border-radius:5px;">
+# 라즈베리파이에서
+./ngrok http 8000</pre>
+          </li>
+          <li><strong>자체 서명 인증서 생성:</strong>
+            <pre style="background:#f4f4f4; padding:10px; border-radius:5px;">
+openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes
+python manage.py runserver_plus --cert-file cert.pem --key-file key.pem 0.0.0.0:8000</pre>
+          </li>
+        </ol>
+      </div>`;
+  }
+
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    solutions += `
+      <div class="status error">
+        <h3>❌ Chromium 업데이트 필요</h3>
+        <pre style="background:#f4f4f4; padding:10px; border-radius:5px;">
+# 라즈베리파이에서
+sudo apt update
+sudo apt install chromium-browser
+chromium-browser --version</pre>
+      </div>`;
+  }
+
+  if (!navigator.onLine) {
+    solutions += `
+      <div class="status error">
+        <h3>❌ 인터넷 연결 확인</h3>
+        <p>Web Speech API는 Google 서버를 사용하므로 인터넷 연결이 필요합니다.</p>
+      </div>`;
+  }
+
+  if (solutions === '') {
+    solutions = '<div class="status success">✅ 모든 요구사항이 충족되었습니다!</div>';
+  }
+
+  solutionsDiv.innerHTML = solutions;
+}
+
+// 페이지 로드 시 모든 체크 실행
+window.addEventListener('DOMContentLoaded', () => {
+  checkEnvironment();
+  checkBrowserSupport();
+  checkSecurity();
+  showSolutions();
+});
+</script>
+</body>
+</html>
